@@ -12,4 +12,4 @@ def diff_processes(before, after):
     return {
         "added": [after_processes[key] for key in added_keys],
         "removed": [before_processes[key] for key in removed_keys],
-    }
+    } 
