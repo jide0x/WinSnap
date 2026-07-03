@@ -1,0 +1,1 @@
+WinSnap is a lightweight Windows system snapshot and change-analysis tool that helps users understand what changed on a machine without requiring enterprise security software.

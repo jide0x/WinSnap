@@ -1,10 +1,12 @@
 import sys
-import json
-from pathlib import Path
-from src.main import take_snapshot, diff_snapshots
 
-
-SNAPSHOT_DIR = Path("snapshots")
+from src.main import (
+    create_snapshot,
+    diff_snapshots,
+    list_all_snapshots,
+    show_snapshot,
+    remove_snapshot,
+)
 
 
 def usage():
@@ -16,76 +18,36 @@ def usage():
     print("  python winsnap delete <name>")
 
 
-def snapshot_path(name):
-    return SNAPSHOT_DIR / f"{name}.json"
-
-
-def list_snapshots():
-    SNAPSHOT_DIR.mkdir(exist_ok=True)
-
-    snapshots = sorted(SNAPSHOT_DIR.glob("*.json"))
-
-    if not snapshots:
-        print("No snapshots found.")
-        return
-
-    print("Snapshots:")
-    for snap in snapshots:
-        print(f"  - {snap.stem}")
-
-
-def show_snapshot(name):
-    path = snapshot_path(name)
-
-    if not path.exists():
-        print(f"Snapshot not found: {name}")
-        return
-
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    processes = data.get("processes", [])
-
-    print(f"Snapshot: {data.get('name')}")
-    print(f"Created : {data.get('created_at')}")
-    print(f"Processes: {len(processes)}")
-
-
-def delete_snapshot(name):
-    path = snapshot_path(name)
-
-    if not path.exists():
-        print(f"Snapshot not found: {name}")
-        return
-
-    path.unlink()
-    print(f"Deleted snapshot: {name}")
-
-
 def main():
     args = sys.argv[1:]
 
-    if len(args) == 2 and args[0] == "create":
-        take_snapshot(args[1])
-        return
+    try:
+        if len(args) == 2 and args[0] == "create":
+            create_snapshot(args[1])
+            return
 
-    if len(args) == 3 and args[0] == "diff":
-        diff_snapshots(snapshot_path(args[1]), snapshot_path(args[2]))
-        return
+        if len(args) == 3 and args[0] == "diff":
+            diff_snapshots(args[1], args[2])
+            return
 
-    if len(args) == 1 and args[0] == "list":
-        list_snapshots()
-        return
+        if len(args) == 1 and args[0] == "list":
+            list_all_snapshots()
+            return
 
-    if len(args) == 2 and args[0] == "show":
-        show_snapshot(args[1])
-        return
+        if len(args) == 2 and args[0] == "show":
+            show_snapshot(args[1])
+            return
 
-    if len(args) == 2 and args[0] == "delete":
-        delete_snapshot(args[1])
-        return
+        if len(args) == 2 and args[0] == "delete":
+            remove_snapshot(args[1])
+            return
 
-    usage()
+        usage()
+
+    except FileNotFoundError as e:
+        print(f"[!] {e}")
+    except Exception as e:
+        print(f"[!] Error: {e}")
 
 
 if __name__ == "__main__":

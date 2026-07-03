@@ -1,108 +1,73 @@
-import argparse
-import json
-import subprocess
 from datetime import datetime
-from pathlib import Path
+
+from src.collectors import collect_processes
+from src.snapshot_store import (
+    save_snapshot,
+    load_snapshot,
+    list_snapshots,
+    delete_snapshot,
+)
+from src.differ import diff_processes
 
 
-SNAPSHOT_DIR = Path("snapshots")
-
-
-def collect_processes():
-    command = [
-        "powershell",
-        "-NoProfile",
-        "-Command",
-        "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json"
-    ]
-
-    result = subprocess.run(command, capture_output=True, text=True)
-
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr)
-
-    data = json.loads(result.stdout)
-
-    if isinstance(data, dict):
-        data = [data]
-
-    return data
-
-
-def take_snapshot(name):
-    SNAPSHOT_DIR.mkdir(exist_ok=True)
-
+def create_snapshot(name):
     snapshot = {
         "name": name,
         "created_at": datetime.now().isoformat(timespec="seconds"),
-        "processes": collect_processes()
+        "version": "0.1",
+        "collectors": ["processes"],
+        "processes": collect_processes(),
     }
 
-    path = SNAPSHOT_DIR / f"{name}.json"
-
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(snapshot, f, indent=2)
-
+    path = save_snapshot(snapshot)
     print(f"[+] Snapshot saved: {path}")
 
 
-def load_snapshot(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+def show_snapshot(name):
+    snapshot = load_snapshot(name)
+
+    print(f"Snapshot : {snapshot.get('name')}")
+    print(f"Created  : {snapshot.get('created_at')}")
+    print(f"Version  : {snapshot.get('version')}")
+    print(f"Collectors: {', '.join(snapshot.get('collectors', []))}")
+    print(f"Processes: {len(snapshot.get('processes', []))}")
 
 
-def process_key(proc):
-    return f"{proc.get('Name')}|{proc.get('ExecutablePath')}|{proc.get('CommandLine')}"
+def list_all_snapshots():
+    snapshots = list_snapshots()
+
+    if not snapshots:
+        print("No snapshots found.")
+        return
+
+    print("Snapshots:")
+    for snap in snapshots:
+        print(f"  - {snap.stem}")
 
 
-def diff_snapshots(before_path, after_path):
-    before = load_snapshot(before_path)
-    after = load_snapshot(after_path)
+def remove_snapshot(name):
+    delete_snapshot(name)
+    print(f"Deleted snapshot: {name}")
 
-    before_processes = {process_key(p): p for p in before["processes"]}
-    after_processes = {process_key(p): p for p in after["processes"]}
 
-    added = after_processes.keys() - before_processes.keys()
-    removed = before_processes.keys() - after_processes.keys()
+def diff_snapshots(before_name, after_name):
+    before = load_snapshot(before_name)
+    after = load_snapshot(after_name)
 
-    print("\n=== WinSnap Process Diff ===")
-    print(f"Before: {before['name']} at {before['created_at']}")
-    print(f"After : {after['name']} at {after['created_at']}")
+    diff = diff_processes(before, after)
 
-    print(f"\n[+] Added Processes: {len(added)}")
-    for key in added:
-        p = after_processes[key]
+    print("\n=== WinSnap Diff ===")
+    print(f"Before: {before.get('name')} at {before.get('created_at')}")
+    print(f"After : {after.get('name')} at {after.get('created_at')}")
+
+    print(f"\n[+] Added Processes: {len(diff['added'])}")
+    for p in diff["added"]:
         print(f"  + {p.get('Name')} PID={p.get('ProcessId')}")
         print(f"    Path: {p.get('ExecutablePath')}")
         print(f"    Cmd : {p.get('CommandLine')}")
 
-    print(f"\n[-] Removed Processes: {len(removed)}")
-    for key in removed:
-        p = before_processes[key]
+    print(f"\n[-] Removed Processes: {len(diff['removed'])}")
+    for p in diff["removed"]:
         print(f"  - {p.get('Name')} PID={p.get('ProcessId')}")
         print(f"    Path: {p.get('ExecutablePath')}")
         print(f"    Cmd : {p.get('CommandLine')}")
-
-
-def main():
-    parser = argparse.ArgumentParser(description="WinSnap: simple Windows process snapshot diff tool")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    snapshot_parser = subparsers.add_parser("snapshot")
-    snapshot_parser.add_argument("name")
-
-    diff_parser = subparsers.add_parser("diff")
-    diff_parser.add_argument("before")
-    diff_parser.add_argument("after")
-
-    args = parser.parse_args()
-
-    if args.command == "snapshot":
-        take_snapshot(args.name)
-
-    elif args.command == "diff":
-        diff_snapshots(args.before, args.after)
-
-
-if __name__ == "__main__":
-    main()
