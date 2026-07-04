@@ -1,0 +1,21 @@
+name: WinSnap CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  syntax-check:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Compile Python files
+        run: python -m compileall src
