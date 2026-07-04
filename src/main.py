@@ -9,6 +9,7 @@ from src.snapshot_store import (
     load_snapshot,
     list_snapshots,
     delete_snapshot,
+    snapshot_path,
 )
 from src.differ import diff_processes
 
@@ -57,6 +58,7 @@ def format_list_datetime(value):
 
 
 def print_snapshot_summary(snapshot):
+    print()
     print(rule())
     print("WinSnap".center(BOX_WIDTH))
     print(rule())
@@ -73,6 +75,7 @@ def print_snapshot_summary(snapshot):
         print(f" • {collector.title()}")
     print()
     print(rule())
+    print()
 
 
 def print_process(process, marker=""):
@@ -88,6 +91,16 @@ def print_process(process, marker=""):
 
 
 def create_snapshot(name):
+    if snapshot_path(name).exists():
+        print(f'Snapshot "{name}" already exists.')
+        print()
+        print("Overwrite?")
+        print()
+        response = input("[y/N] ").strip().lower()
+        if response != "y":
+            print("Snapshot not overwritten.")
+            return
+
     snapshot = {
         "name": name,
         "version": "0.2",
@@ -115,6 +128,7 @@ def list_all_snapshots():
         print("No snapshots found.")
         return
 
+    print()
     print(rule(LIST_WIDTH))
     print()
     print("Snapshots")
@@ -131,6 +145,7 @@ def list_all_snapshots():
         )
     print()
     print(rule(LIST_WIDTH))
+    print()
 
 
 def remove_snapshot(name):
