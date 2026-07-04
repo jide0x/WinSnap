@@ -38,3 +38,7 @@ def info(text):
 
 def bold(text):
     return color(text, Color.BOLD)
+
+
+def rule(width, char="═"):
+    return char * width

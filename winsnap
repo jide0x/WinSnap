@@ -1,8 +1,5 @@
 import sys
 
-
-VERSION = "0.2"
-
 from src.main import (
     create_snapshot,
     diff_snapshots,
@@ -11,6 +8,7 @@ from src.main import (
     remove_snapshot,
 )
 from src.ui import error, info, bold
+from src.version import VERSION
 
 
 def usage():
@@ -27,7 +25,11 @@ def usage():
     print(bold("Commands"))
     print()
     print("  create <name>           Create a process snapshot")
+    print("  create <name> --note <text>")
+    print("                           Create a snapshot with a note")
     print("  diff <before> <after>   Compare two snapshots")
+    print("  diff <before> <after> --details")
+    print("                           Show detailed process changes")
     print("  list                    List saved snapshots")
     print("  show <name>             Show snapshot summary")
     print("  delete <name>           Delete a snapshot")
@@ -37,8 +39,10 @@ def usage():
     print(bold("Examples"))
     print()
     print("  python winsnap create before")
+    print('  python winsnap create before --note "before install"')
     print("  python winsnap create after")
     print("  python winsnap diff before after")
+    print("  python winsnap diff before after --details")
     print()
     print(info("═" * width))
     print()
@@ -64,8 +68,16 @@ def main():
             create_snapshot(args[1])
             return
 
+        if len(args) == 4 and args[0] == "create" and args[2] == "--note":
+            create_snapshot(args[1], note=args[3])
+            return
+
         if len(args) == 3 and args[0] == "diff":
             diff_snapshots(args[1], args[2])
+            return
+
+        if len(args) == 4 and args[0] == "diff" and args[3] == "--details":
+            diff_snapshots(args[1], args[2], details=True)
             return
 
         if len(args) == 1 and args[0] == "list":
@@ -85,6 +97,8 @@ def main():
         usage()
 
     except FileNotFoundError as e:
+        print(error(f"❌ {e}"))
+    except ValueError as e:
         print(error(f"❌ {e}"))
     except KeyboardInterrupt:
         print(error("\n❌ Operation cancelled."))

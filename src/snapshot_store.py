@@ -1,15 +1,25 @@
 import json
 from pathlib import Path
+import re
 
 
 SNAPSHOT_DIR = Path("snapshots")
+SNAPSHOT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def ensure_snapshot_dir():
     SNAPSHOT_DIR.mkdir(exist_ok=True)
 
 
+def validate_snapshot_name(name):
+    if not SNAPSHOT_NAME_PATTERN.fullmatch(name):
+        raise ValueError(
+            f'Invalid snapshot name: "{name}". Use letters, numbers, dashes, or underscores.'
+        )
+
+
 def snapshot_path(name):
+    validate_snapshot_name(name)
     return SNAPSHOT_DIR / f"{name}.json"
 
 
