@@ -3,10 +3,13 @@ import sys
 from src.main import (
     create_snapshot,
     diff_snapshots,
+    inspect_snapshot,
     list_all_snapshots,
+    search_snapshots,
     show_snapshot,
     remove_snapshot,
 )
+from src.snapshot_store import list_snapshots
 from src.ui import error, info, bold
 from src.version import VERSION
 
@@ -30,6 +33,13 @@ def usage():
     print("  diff <before> <after>   Compare two snapshots")
     print("  diff <before> <after> --details")
     print("                           Show detailed process changes")
+    print("  inspect <snapshot> <query>")
+    print("                           Inspect matching processes")
+    print("  inspect <snapshot> <query> --details")
+    print("                           Show detailed matching processes")
+    print("  search <query>          Search all snapshots for a process")
+    print("  search <query> --details")
+    print("                           Show detailed matches across snapshots")
     print("  list                    List saved snapshots")
     print("  show <name>             Show snapshot summary")
     print("  delete <name>           Delete a snapshot")
@@ -43,8 +53,25 @@ def usage():
     print("  python winsnap create after")
     print("  python winsnap diff before after")
     print("  python winsnap diff before after --details")
+    print("  python winsnap inspect before firefox")
+    print("  python winsnap inspect before firefox --details")
+    print("  python winsnap search firefox")
+    print("  python winsnap search firefox --details")
     print()
     print(info("═" * width))
+    print()
+
+
+def print_existing_snapshots():
+    snapshots = list_snapshots()
+    if not snapshots:
+        return
+
+    print()
+    print("Existing snapshots:")
+    print()
+    for snapshot in snapshots:
+        print(snapshot.stem)
     print()
 
 def main():
@@ -80,6 +107,22 @@ def main():
             diff_snapshots(args[1], args[2], details=True)
             return
 
+        if len(args) == 3 and args[0] == "inspect":
+            inspect_snapshot(args[1], args[2])
+            return
+
+        if len(args) == 4 and args[0] == "inspect" and args[3] == "--details":
+            inspect_snapshot(args[1], args[2], details=True)
+            return
+
+        if len(args) == 2 and args[0] == "search":
+            search_snapshots(args[1])
+            return
+
+        if len(args) == 3 and args[0] == "search" and args[2] == "--details":
+            search_snapshots(args[1], details=True)
+            return
+
         if len(args) == 1 and args[0] == "list":
             list_all_snapshots()
             return
@@ -98,6 +141,7 @@ def main():
 
     except FileNotFoundError as e:
         print(error(f"❌ {e}"))
+        print_existing_snapshots()
     except ValueError as e:
         print(error(f"❌ {e}"))
     except KeyboardInterrupt:

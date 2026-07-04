@@ -13,6 +13,8 @@ from src.snapshot_store import (
 )
 from src.differ import diff_processes
 from src.diff_view import print_detailed_diff, print_diff_summary
+from src.inspect_view import print_process_inspection
+from src.search_view import print_process_search
 from src.snapshot_view import print_snapshot_list, print_snapshot_summary
 from src.ui import success, warning
 from src.version import VERSION
@@ -58,6 +60,16 @@ def list_all_snapshots():
 def remove_snapshot(name):
     delete_snapshot(name)
     print(success(f"Deleted snapshot: {name}"))
+
+
+def inspect_snapshot(name, query, details=False):
+    snapshot = load_snapshot(name)
+    print_process_inspection(snapshot, query, details=details)
+
+
+def search_snapshots(query, details=False):
+    snapshots = [load_snapshot(path.stem) for path in list_snapshots()]
+    print_process_search(snapshots, query, details=details)
 
 
 def diff_snapshots(before_name, after_name, details=False):
