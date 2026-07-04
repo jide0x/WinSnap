@@ -1,5 +1,8 @@
 import sys
 
+
+VERSION = "0.2"
+
 from src.main import (
     create_snapshot,
     diff_snapshots,
@@ -7,36 +10,38 @@ from src.main import (
     show_snapshot,
     remove_snapshot,
 )
+from src.ui import error, info, bold
 
 
 def usage():
     width = 60
     print()
-    print("═" * width)
-    print("WinSnap Help".center(width))
-    print("═" * width)
+    print(info("═" * width))
+    print(bold("WinSnap Help".center(width)))
+    print(info("═" * width))
     print()
-    print("Usage")
+    print(bold("Usage"))
     print()
     print("  python winsnap <command> [options]")
     print()
-    print("Commands")
+    print(bold("Commands"))
     print()
     print("  create <name>           Create a process snapshot")
     print("  diff <before> <after>   Compare two snapshots")
     print("  list                    List saved snapshots")
     print("  show <name>             Show snapshot summary")
     print("  delete <name>           Delete a snapshot")
+    print("  version                 Show WinSnap version")
     print("  help                    Show this help menu")
     print()
-    print("Examples")
+    print(bold("Examples"))
     print()
     print("  python winsnap create before")
     print("  python winsnap create after")
     print("  python winsnap diff before after")
     print()
-    print("═" * width)
-    print();
+    print(info("═" * width))
+    print()
 
 def main():
     if hasattr(sys.stdout, "reconfigure"):
@@ -49,6 +54,10 @@ def main():
     try:
         if len(args) == 0 or (len(args) == 1 and args[0] in {"help", "--help", "-h"}):
             usage()
+            return
+
+        if len(args) == 1 and args[0] in {"version", "--version", "-v"}:
+            print(info(f"WinSnap {VERSION}"))
             return
 
         if len(args) == 2 and args[0] == "create":
@@ -71,16 +80,16 @@ def main():
             remove_snapshot(args[1])
             return
 
-        print("❌ Invalid command.")
+        print(error("❌ Invalid command."))
         print()
         usage()
 
     except FileNotFoundError as e:
-        print(f"❌ {e}")
+        print(error(f"❌ {e}"))
     except KeyboardInterrupt:
-        print("\n❌ Operation cancelled.")
+        print(error("\n❌ Operation cancelled."))
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(error(f"❌ Error: {e}"))
 
 
 if __name__ == "__main__":
