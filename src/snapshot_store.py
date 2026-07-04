@@ -27,7 +27,7 @@ def load_snapshot(name):
     path = snapshot_path(name)
 
     if not path.exists():
-        raise FileNotFoundError(f"Snapshot not found: {name}")
+        raise FileNotFoundError(f'Snapshot "{name}" not found.')
 
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -42,6 +42,6 @@ def delete_snapshot(name):
     path = snapshot_path(name)
 
     if not path.exists():
-        raise FileNotFoundError(f"Snapshot not found: {name}")
+        raise FileNotFoundError(f'Snapshot "{name}" not found.')
 
     path.unlink()

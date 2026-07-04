@@ -10,21 +10,47 @@ from src.main import (
 
 
 def usage():
-    print("Usage:")
-    print("  python winsnap create <name>")
-    print("  python winsnap diff <before> <after>")
-    print("  python winsnap list")
-    print("  python winsnap show <name>")
-    print("  python winsnap delete <name>")
-
+    width = 60
+    print()
+    print("═" * width)
+    print("WinSnap Help".center(width))
+    print("═" * width)
+    print()
+    print("Usage")
+    print()
+    print("  python winsnap <command> [options]")
+    print()
+    print("Commands")
+    print()
+    print("  create <name>           Create a process snapshot")
+    print("  diff <before> <after>   Compare two snapshots")
+    print("  list                    List saved snapshots")
+    print("  show <name>             Show snapshot summary")
+    print("  delete <name>           Delete a snapshot")
+    print("  help                    Show this help menu")
+    print()
+    print("Examples")
+    print()
+    print("  python winsnap create before")
+    print("  python winsnap create after")
+    print("  python winsnap diff before after")
+    print()
+    print("═" * width)
+    print();
 
 def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
 
     args = sys.argv[1:]
 
     try:
+        if len(args) == 0 or (len(args) == 1 and args[0] in {"help", "--help", "-h"}):
+            usage()
+            return
+
         if len(args) == 2 and args[0] == "create":
             create_snapshot(args[1])
             return
@@ -45,12 +71,16 @@ def main():
             remove_snapshot(args[1])
             return
 
+        print("❌ Invalid command.")
+        print()
         usage()
 
     except FileNotFoundError as e:
-        print(f"[!] {e}")
+        print(f"❌ {e}")
+    except KeyboardInterrupt:
+        print("\n❌ Operation cancelled.")
     except Exception as e:
-        print(f"[!] Error: {e}")
+        print(f"❌ Error: {e}")
 
 
 if __name__ == "__main__":
