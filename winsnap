@@ -24,6 +24,26 @@ def build_parser():
     parser = WinSnapArgumentParser(
         prog="python winsnap",
         description="WinSnap - lightweight Windows snapshot and change analysis.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Workflow:
+  python winsnap create before --note "clean system"
+  python winsnap create after --note "after install"
+  python winsnap diff before after
+  python winsnap diff before after --details
+
+Examples:
+  python winsnap list
+  python winsnap show before
+  python winsnap inspect before firefox
+  python winsnap inspect before LocalSystem --details
+  python winsnap search firefox
+  python winsnap search LocalSystem --details
+
+Collectors:
+  processes
+  services
+""",
     )
     parser.add_argument(
         "--version",
@@ -34,7 +54,7 @@ def build_parser():
 
     subparsers = parser.add_subparsers(dest="command", parser_class=WinSnapArgumentParser)
 
-    create_parser = subparsers.add_parser("create", help="Create a process snapshot")
+    create_parser = subparsers.add_parser("create", help="Create a process/service snapshot")
     create_parser.add_argument("name")
     create_parser.add_argument("--note", default="", help="Add a note to the snapshot")
 
@@ -43,7 +63,7 @@ def build_parser():
     diff_parser.add_argument("after")
     diff_parser.add_argument("--details", action="store_true", help="Show detailed process changes")
 
-    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services in a snapshot")
+    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services in one snapshot")
     inspect_parser.add_argument("snapshot")
     inspect_parser.add_argument("query")
     inspect_parser.add_argument("--details", action="store_true", help="Show detailed matching entries")
