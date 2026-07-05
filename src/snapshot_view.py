@@ -12,6 +12,24 @@ def process_count(snapshot):
     return len(snapshot.get("processes", []))
 
 
+def service_count(snapshot):
+    if "services" not in snapshot:
+        return None
+    return len(snapshot.get("services", []))
+
+
+def format_count(value):
+    if value is None:
+        return "Not collected"
+    return str(value)
+
+
+def format_list_count(value):
+    if value is None:
+        return "N/C"
+    return str(value)
+
+
 def snapshot_collectors(snapshot):
     return snapshot.get("collector") or snapshot.get("collectors", [])
 
@@ -56,7 +74,9 @@ def print_snapshot_summary(snapshot):
     print()
     print(f"Created       : {format_full_datetime(snapshot.get('created_at'))}")
     print()
-    print(f"Processes     : {process_count(snapshot)}")
+    print(f"Processes     : {format_count(process_count(snapshot))}")
+    print()
+    print(f"Services      : {format_count(service_count(snapshot))}")
     if snapshot_note(snapshot):
         print()
         print(f"Note          : {snapshot_note(snapshot)}")
@@ -80,7 +100,7 @@ def print_snapshot_list(snapshots):
     print()
     print(bold("Snapshots"))
     print()
-    print(f"{'Name':<{LIST_NAME_WIDTH}} {'Created':<22} {'Processes':>9}  Note")
+    print(f"{'Name':<{LIST_NAME_WIDTH}} {'Created':<22} {'Proc':>5} {'Svc':>5}  Note")
     print()
     print("-" * LIST_WIDTH)
     print()
@@ -88,7 +108,8 @@ def print_snapshot_list(snapshots):
         print(
             f"{snap.get('name', 'Unknown'):<{LIST_NAME_WIDTH}} "
             f"{format_list_datetime(snap.get('created_at')):<22} "
-            f"{process_count(snap):>9}  "
+            f"{format_list_count(process_count(snap)):>5} "
+            f"{format_list_count(service_count(snap)):>5}  "
             f"{snapshot_note(snap)}"
         )
     print()

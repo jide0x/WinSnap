@@ -43,12 +43,12 @@ def build_parser():
     diff_parser.add_argument("after")
     diff_parser.add_argument("--details", action="store_true", help="Show detailed process changes")
 
-    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes in a snapshot")
+    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services in a snapshot")
     inspect_parser.add_argument("snapshot")
     inspect_parser.add_argument("query")
-    inspect_parser.add_argument("--details", action="store_true", help="Show detailed matching processes")
+    inspect_parser.add_argument("--details", action="store_true", help="Show detailed matching entries")
 
-    search_parser = subparsers.add_parser("search", help="Search all snapshots for a process")
+    search_parser = subparsers.add_parser("search", help="Search all snapshots for processes/services")
     search_parser.add_argument("query")
     search_parser.add_argument("--details", action="store_true", help="Show detailed matches across snapshots")
 

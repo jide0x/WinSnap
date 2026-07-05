@@ -3,9 +3,10 @@ import subprocess
 
 
 PROCESS_COLLECTION_TIMEOUT_SECONDS = 30
+SERVICE_COLLECTION_TIMEOUT_SECONDS = 30
 
-# Collect running processes on Windows using Powershell
-def collect_processes():
+
+def run_powershell_json(command_text, timeout):
     command = [
         "powershell",
         "-NoProfile",
@@ -13,14 +14,14 @@ def collect_processes():
         "-ExecutionPolicy",
         "Bypass",
         "-Command",
-        "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json",
+        command_text,
     ]
 
     result = subprocess.run(
         command,
         capture_output=True,
         text=True,
-        timeout=PROCESS_COLLECTION_TIMEOUT_SECONDS,
+        timeout=timeout,
     )
 
     if result.returncode != 0:
@@ -35,3 +36,18 @@ def collect_processes():
         data = [data]
 
     return data
+
+
+# Collect running processes on Windows using Powershell
+def collect_processes():
+    return run_powershell_json(
+        "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,Name,ExecutablePath,CommandLine | ConvertTo-Json",
+        PROCESS_COLLECTION_TIMEOUT_SECONDS,
+    )
+
+
+def collect_services():
+    return run_powershell_json(
+        "Get-CimInstance Win32_Service | Select-Object Name,DisplayName,State,Status,StartMode,StartName,PathName,ProcessId | ConvertTo-Json",
+        SERVICE_COLLECTION_TIMEOUT_SECONDS,
+    )

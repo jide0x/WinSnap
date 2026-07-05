@@ -3,7 +3,7 @@ import getpass
 import platform
 import socket
 
-from src.collectors import collect_processes
+from src.collectors import collect_processes, collect_services
 from src.snapshot_store import (
     save_snapshot,
     load_snapshot,
@@ -11,7 +11,7 @@ from src.snapshot_store import (
     delete_snapshot,
     snapshot_path,
 )
-from src.differ import diff_processes
+from src.differ import diff_processes, diff_services
 from src.diff_view import print_detailed_diff, print_diff_summary
 from src.inspect_view import print_process_inspection
 from src.search_view import print_process_search
@@ -38,9 +38,10 @@ def create_snapshot(name, note=""):
         "username": getpass.getuser(),
         "windows_version": platform.platform(),
         "created_at": datetime.now().isoformat(timespec="seconds"),
-        "collector": ["processes"],
+        "collector": ["processes", "services"],
         "note": note,
         "processes": collect_processes(),
+        "services": collect_services(),
     }
 
     save_snapshot(snapshot)
@@ -76,7 +77,10 @@ def diff_snapshots(before_name, after_name, details=False):
     before = load_snapshot(before_name)
     after = load_snapshot(after_name)
 
-    diff = diff_processes(before, after)
+    diff = {
+        "processes": diff_processes(before, after),
+        "services": diff_services(before, after),
+    }
 
     if details:
         print_detailed_diff(before, after, diff)
