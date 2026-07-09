@@ -1,7 +1,20 @@
 # Changelog
 
+## 0.5
+
+- Reorganized command handlers into `src/commands/` and terminal rendering into `src/views/`.
+- Reorganized collectors into dedicated modules under `src/collectors/`.
+- Added scheduled task collection.
+- Added scheduled task counts to `show` and `list`.
+- Added scheduled task changes to `diff` summary output.
+- Added scheduled task entries to `diff --details`.
+- Added scheduled task risk hints for enabled tasks, SYSTEM tasks, logon/startup triggers, command/script hosts, and user-writable action paths.
+- Expanded `inspect` to search processes, services, and scheduled tasks.
+- Expanded `search` to search processes, services, and scheduled tasks across snapshots.
+
 ## 0.4
 
+- Archived the Markdown diff export prototype before release.
 - Added Windows service collection.
 - Added service counts to `show` and `list`.
 - Added service changes to `diff` summary output.

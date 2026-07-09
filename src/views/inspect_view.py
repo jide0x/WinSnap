@@ -1,8 +1,8 @@
 from collections import Counter
 
-from src.diff_view import print_service, service_name
-from src.process_view import print_process
-from src.ui import error, info, bold, rule
+from src.views.diff_view import print_scheduled_task, print_service, service_name, task_name
+from src.views.process_view import print_process
+from src.views.ui import error, info, bold, rule
 
 
 INSPECT_WIDTH = 60
@@ -28,6 +28,20 @@ def service_matches(service, query):
         service.get("StartMode"),
         service.get("StartName"),
         service.get("PathName"),
+    ]
+    return any(query in str(field).lower() for field in fields if field)
+
+
+def scheduled_task_matches(task, query):
+    query = query.lower()
+    fields = [
+        task.get("TaskName"),
+        task.get("TaskPath"),
+        task.get("State"),
+        task.get("Author"),
+        task.get("RunAsUser"),
+        task.get("Triggers"),
+        task.get("Actions"),
     ]
     return any(query in str(field).lower() for field in fields if field)
 
@@ -60,11 +74,19 @@ def matching_services(snapshot, query):
     ]
 
 
+def matching_scheduled_tasks(snapshot, query):
+    return [
+        task
+        for task in snapshot.get("scheduled_tasks", [])
+        if scheduled_task_matches(task, query)
+    ]
+
+
 def print_inspect_header(snapshot, query):
     print()
     print(info(rule(INSPECT_WIDTH)))
     print()
-    print(bold("Process Inspection"))
+    print(bold("Snapshot Inspection"))
     print()
     print(f"Snapshot : {snapshot.get('name')}")
     print(f"Query    : {query}")
@@ -76,11 +98,12 @@ def print_inspect_header(snapshot, query):
 def print_process_inspection(snapshot, query, details=False):
     process_matches = matching_processes(snapshot, query)
     service_matches = matching_services(snapshot, query)
+    task_matches = matching_scheduled_tasks(snapshot, query)
 
     print_inspect_header(snapshot, query)
 
-    if not process_matches and not service_matches:
-        print(error("No matching processes or services found."))
+    if not process_matches and not service_matches and not task_matches:
+        print(error("No matching processes, services, or scheduled tasks found."))
         print()
         return
 
@@ -95,10 +118,13 @@ def print_process_inspection(snapshot, query, details=False):
     service_names = Counter(service_name(service) for service in service_matches)
     service_states = Counter(service.get("State") or "Unknown" for service in service_matches)
     service_start_modes = Counter(service.get("StartMode") or "Unknown" for service in service_matches)
+    task_names = Counter(task_name(task) for task in task_matches)
+    task_states = Counter(task.get("State") or "Unknown" for task in task_matches)
 
     print(bold("Summary"))
     print(f"  {'Matching processes':<22} {len(process_matches)}")
     print(f"  {'Matching services':<22} {len(service_matches)}")
+    print(f"  {'Matching tasks':<22} {len(task_matches)}")
     print(f"  {'Unique names':<22} {len(names)}")
     print(f"  {'Unique paths':<22} {len(paths)}")
     print(f"  {'Parent PIDs':<22} {len(parent_pids)}")
@@ -138,8 +164,19 @@ def print_process_inspection(snapshot, query, details=False):
             print(f"  {start_mode:<20} {count}")
         print()
 
+    if task_matches:
+        print(bold("Scheduled Tasks"))
+        for name, count in task_names.most_common():
+            print(f"  {name:<50} {count}")
+        print()
+
+        print(bold("Scheduled Task States"))
+        for state, count in task_states.most_common():
+            print(f"  {state:<20} {count}")
+        print()
+
     if not details:
-        print(bold("Use --details to view full process and service entries."))
+        print(bold("Use --details to view full process, service, and scheduled task entries."))
         print()
         return
 
@@ -159,4 +196,13 @@ def print_process_inspection(snapshot, query, details=False):
             print(info(rule(INSPECT_WIDTH, "─")))
             print()
             print_service(service)
+            print()
+
+    if task_matches:
+        print(bold("Scheduled Task Entries"))
+        print()
+        for task in task_matches:
+            print(info(rule(INSPECT_WIDTH, "─")))
+            print()
+            print_scheduled_task(task)
             print()

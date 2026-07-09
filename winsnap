@@ -11,7 +11,7 @@ from src.main import (
     remove_snapshot,
 )
 from src.snapshot_store import list_snapshots
-from src.ui import error, info
+from src.views.ui import error, info
 from src.version import VERSION
 
 
@@ -43,6 +43,7 @@ Examples:
 Collectors:
   processes
   services
+  scheduled tasks
 """,
     )
     parser.add_argument(
@@ -54,7 +55,7 @@ Collectors:
 
     subparsers = parser.add_subparsers(dest="command", parser_class=WinSnapArgumentParser)
 
-    create_parser = subparsers.add_parser("create", help="Create a process/service snapshot")
+    create_parser = subparsers.add_parser("create", help="Create a process/service/scheduled task snapshot")
     create_parser.add_argument("name")
     create_parser.add_argument("--note", default="", help="Add a note to the snapshot")
 
@@ -63,12 +64,12 @@ Collectors:
     diff_parser.add_argument("after")
     diff_parser.add_argument("--details", action="store_true", help="Show detailed process changes")
 
-    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services in one snapshot")
+    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services/scheduled tasks in one snapshot")
     inspect_parser.add_argument("snapshot")
     inspect_parser.add_argument("query")
     inspect_parser.add_argument("--details", action="store_true", help="Show detailed matching entries")
 
-    search_parser = subparsers.add_parser("search", help="Search all snapshots for processes/services")
+    search_parser = subparsers.add_parser("search", help="Search all snapshots for processes/services/scheduled tasks")
     search_parser.add_argument("query")
     search_parser.add_argument("--details", action="store_true", help="Show detailed matches across snapshots")
 

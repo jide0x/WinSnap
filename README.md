@@ -5,12 +5,13 @@ WinSnap is a lightweight Windows snapshot and change-analysis CLI.
 
 It captures selected Windows system state, saves it as JSON, and helps you compare snapshots to understand what changed over time.
 
-Current version: `0.4`
+Current version: `0.5`
 
 Current collectors:
 
 - Processes
 - Services
+- Scheduled tasks
 
 Core Workflow
 -------------
@@ -109,6 +110,33 @@ Detailed service output can show risk hints such as:
 
 These are not detections by themselves. They are context clues that help you decide what deserves closer inspection.
 
+Scheduled Task Risk Hints
+-------------------------
+
+Detailed scheduled task output can show risk hints such as:
+
+- Enabled scheduled task
+- Runs as SYSTEM
+- Runs at logon
+- Runs at startup
+- Executes command or scripting host
+- Action path in user-writable location
+
+These are not detections by themselves. They are context clues that help you decide what deserves closer inspection.
+
+Scheduled Task Collection
+-------------------------
+
+Scheduled task snapshots currently collect:
+
+- Task name
+- Task path
+- State
+- Author
+- Run as user
+- Triggers
+- Actions
+
 Snapshot Storage
 ----------------
 
@@ -128,7 +156,6 @@ WinSnap is being built toward local Windows security change analysis: capture sy
 
 Planned future collectors may include:
 
-- Scheduled tasks
 - Registry run keys
 - Startup folders
 - Network connections

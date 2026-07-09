@@ -1,7 +1,7 @@
 from collections import Counter
 
-from src.process_view import print_process
-from src.ui import success, error, info, bold, rule
+from src.views.process_view import print_process
+from src.views.ui import success, error, info, bold, rule
 
 
 DIFF_WIDTH = 46
@@ -42,6 +42,7 @@ def print_diff_header(before, after):
 def print_diff_summary(before, after, diff):
     process_diff = diff["processes"]
     service_diff = diff["services"]
+    task_diff = diff["scheduled_tasks"]
     added = process_diff["added"]
     removed = process_diff["removed"]
     added_counts = Counter(process_name(process) for process in added)
@@ -70,6 +71,9 @@ def print_diff_summary(before, after, diff):
     print(f"  {'Added services':<27} {len(service_diff['added'])}")
     print(f"  {'Removed services':<27} {len(service_diff['removed'])}")
     print(f"  {'Changed services':<27} {len(service_diff['changed'])}")
+    print(f"  {'Added scheduled tasks':<27} {len(task_diff['added'])}")
+    print(f"  {'Removed scheduled tasks':<27} {len(task_diff['removed'])}")
+    print(f"  {'Changed scheduled tasks':<27} {len(task_diff['changed'])}")
     print()
 
     print(bold("Top Changed Apps"))
@@ -108,7 +112,20 @@ def print_diff_summary(before, after, diff):
     else:
         print("  None")
     print()
-    print(bold("Use --details to view full process and service entries."))
+
+    print(bold("Scheduled Task Changes"))
+    if task_diff["added"] or task_diff["removed"] or task_diff["changed"]:
+        for task in task_diff["added"][:10]:
+            print(f"  + {task_name(task)}")
+        for task in task_diff["removed"][:10]:
+            print(f"  - {task_name(task)}")
+        for item in task_diff["changed"][:10]:
+            fields = ", ".join(item["changes"].keys())
+            print(f"  ~ {task_name(item['after'])} ({fields})")
+    else:
+        print("  None")
+    print()
+    print(bold("Use --details to view full process, service, and scheduled task entries."))
     print()
 
 # Prints detailed diff report (full process entries)
@@ -117,6 +134,7 @@ def print_detailed_diff(before, after, diff):
 
     process_diff = diff["processes"]
     service_diff = diff["services"]
+    task_diff = diff["scheduled_tasks"]
 
     print(success(f"Added Processes ({len(process_diff['added'])})"))
     print()
@@ -166,6 +184,39 @@ def print_detailed_diff(before, after, diff):
             print(f"  {field}")
             print(f"    Before: {values['before']}")
             print(f"    After : {values['after']}")
+        print()
+
+    print()
+    print(success(f"Added Scheduled Tasks ({len(task_diff['added'])})"))
+    print()
+    for task in task_diff["added"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_scheduled_task(task)
+        print()
+
+    print()
+    print(error(f"Removed Scheduled Tasks ({len(task_diff['removed'])})"))
+    print()
+    for task in task_diff["removed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_scheduled_task(task)
+        print()
+
+    print()
+    print(bold(f"Changed Scheduled Tasks ({len(task_diff['changed'])})"))
+    print()
+    for item in task_diff["changed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_scheduled_task(item["after"])
+        print()
+        print(bold(" Changes"))
+        for field, values in item["changes"].items():
+            print(f"  {field}")
+            print(f"    Before: {format_task_value(values['before'])}")
+            print(f"    After : {format_task_value(values['after'])}")
         print()
 
 
@@ -226,3 +277,86 @@ def is_user_writable_path(path):
         "\\programdata\\",
     ]
     return any(marker in path for marker in user_writable_markers)
+
+
+def task_name(task):
+    task_path = task.get("TaskPath") or ""
+    task_name_value = task.get("TaskName") or "Unknown"
+    return f"{task_path}{task_name_value}"
+
+
+def print_scheduled_task(task):
+    print(bold(task_name(task)))
+    print()
+    print(f" Task Name    {task.get('TaskName') or 'Unknown'}")
+    print(f" Task Path    {task.get('TaskPath') or 'Unknown'}")
+    print(f" State        {task.get('State') or 'Unknown'}")
+    print(f" Author       {task.get('Author') or 'Unknown'}")
+    print(f" Run As User  {task.get('RunAsUser') or 'Unknown'}")
+    print(" Triggers")
+    for trigger in task_values(task.get("Triggers")):
+        print(f"  - {trigger}")
+    print(" Actions")
+    for action in task_values(task.get("Actions")):
+        print(f"  - {action}")
+
+    hints = scheduled_task_risk_hints(task)
+    if hints:
+        print()
+        print(bold(" Risk Hints"))
+        for hint in hints:
+            print(f"  ! {hint}")
+
+
+def scheduled_task_risk_hints(task):
+    hints = []
+    state = str(task.get("State") or "").lower()
+    run_as_user = str(task.get("RunAsUser") or "").lower()
+    triggers = " ".join(task_values(task.get("Triggers"))).lower()
+    actions = " ".join(task_values(task.get("Actions"))).lower().replace("/", "\\")
+
+    if state in {"ready", "running"}:
+        hints.append("Enabled scheduled task")
+
+    if run_as_user in {"system", "localsystem", "local system", "nt authority\\system"}:
+        hints.append("Runs as SYSTEM")
+
+    if "logon" in triggers:
+        hints.append("Runs at logon")
+
+    if "startup" in triggers or "boot" in triggers:
+        hints.append("Runs at startup")
+
+    if any(marker in actions for marker in suspicious_action_markers()):
+        hints.append("Executes command or scripting host")
+
+    if is_user_writable_path(actions):
+        hints.append("Action path in user-writable location")
+
+    return hints
+
+
+def suspicious_action_markers():
+    return [
+        "powershell",
+        "pwsh",
+        "cmd.exe",
+        "wscript",
+        "cscript",
+        "mshta",
+        "rundll32",
+        "regsvr32",
+        "schtasks",
+    ]
+
+
+def task_values(value):
+    if value is None or value == "":
+        return ["None"]
+    if isinstance(value, list):
+        return [str(item) for item in value] or ["None"]
+    return [str(value)]
+
+
+def format_task_value(value):
+    return "; ".join(task_values(value))

@@ -9,6 +9,10 @@ def service_key(service):
     return (service.get("Name") or "").lower()
 
 
+def scheduled_task_key(task):
+    return f"{task.get('TaskPath') or ''}|{task.get('TaskName') or ''}".lower()
+
+
 def group_processes(processes):
     grouped = defaultdict(list)
     for process in processes:
@@ -82,6 +86,57 @@ def service_changes(before_service, after_service):
     for field in fields:
         before_value = before_service.get(field)
         after_value = after_service.get(field)
+        if before_value != after_value:
+            changes[field] = {
+                "before": before_value,
+                "after": after_value,
+            }
+
+    return changes
+
+
+def diff_scheduled_tasks(before, after):
+    before_tasks = {
+        scheduled_task_key(task): task
+        for task in before.get("scheduled_tasks", [])
+        if scheduled_task_key(task)
+    }
+    after_tasks = {
+        scheduled_task_key(task): task
+        for task in after.get("scheduled_tasks", [])
+        if scheduled_task_key(task)
+    }
+
+    added_keys = after_tasks.keys() - before_tasks.keys()
+    removed_keys = before_tasks.keys() - after_tasks.keys()
+    common_keys = before_tasks.keys() & after_tasks.keys()
+
+    changed = []
+    for key in sorted(common_keys):
+        before_task = before_tasks[key]
+        after_task = after_tasks[key]
+        changes = scheduled_task_changes(before_task, after_task)
+        if changes:
+            changed.append({
+                "before": before_task,
+                "after": after_task,
+                "changes": changes,
+            })
+
+    return {
+        "added": [after_tasks[key] for key in sorted(added_keys)],
+        "removed": [before_tasks[key] for key in sorted(removed_keys)],
+        "changed": changed,
+    }
+
+
+def scheduled_task_changes(before_task, after_task):
+    fields = ["State", "Author", "RunAsUser", "Triggers", "Actions"]
+    changes = {}
+
+    for field in fields:
+        before_value = before_task.get(field)
+        after_value = after_task.get(field)
         if before_value != after_value:
             changes[field] = {
                 "before": before_value,

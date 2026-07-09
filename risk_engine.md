@@ -18,6 +18,7 @@ Current collectors:
 
 * Processes
 * Services
+* Scheduled tasks
 
 Current service risk hints:
 
@@ -26,7 +27,16 @@ Current service risk hints:
 * Path in user-writable location
 * Missing/unknown PathName
 
-These hints currently appear only in detailed service diff output to avoid cluttering the default summary.
+Current scheduled task risk hints:
+
+* Enabled scheduled task
+* Runs as SYSTEM
+* Runs at logon
+* Runs at startup
+* Executes command or scripting host
+* Action path in user-writable location
+
+These hints currently appear only in detailed diff output to avoid cluttering the default summary.
 
 ---
 
@@ -85,8 +95,6 @@ The score should be used internally to prioritize findings. The user-facing outp
 ---
 
 ## Scheduled Task Risk Indicators
-
-Future collector.
 
 | Indicator           | Suggested Weight | Why It Matters                                                  |
 | ------------------- | ---------------: | --------------------------------------------------------------- |
