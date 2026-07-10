@@ -1,8 +1,8 @@
 from collections import Counter
 
-from src.views.diff_view import print_scheduled_task, print_service, service_name, task_name
-from src.views.process_view import print_process
-from src.views.ui import error, info, bold, rule
+from winsnap.views.diff_view import autorun_name, print_registry_autorun, print_scheduled_task, print_service, service_name, task_name
+from winsnap.views.process_view import print_process
+from winsnap.views.ui import error, info, bold, rule
 
 
 INSPECT_WIDTH = 60
@@ -46,6 +46,17 @@ def scheduled_task_matches(task, query):
     return any(query in str(field).lower() for field in fields if field)
 
 
+def registry_autorun_matches(autorun, query):
+    query = query.lower()
+    fields = [
+        autorun.get("Hive"),
+        autorun.get("KeyPath"),
+        autorun.get("ValueName"),
+        autorun.get("Value"),
+    ]
+    return any(query in str(field).lower() for field in fields if field)
+
+
 def process_name(process):
     return process.get("Name") or "Unknown"
 
@@ -82,6 +93,14 @@ def matching_scheduled_tasks(snapshot, query):
     ]
 
 
+def matching_registry_autoruns(snapshot, query):
+    return [
+        autorun
+        for autorun in snapshot.get("registry_autoruns", [])
+        if registry_autorun_matches(autorun, query)
+    ]
+
+
 def print_inspect_header(snapshot, query):
     print()
     print(info(rule(INSPECT_WIDTH)))
@@ -99,11 +118,12 @@ def print_process_inspection(snapshot, query, details=False):
     process_matches = matching_processes(snapshot, query)
     service_matches = matching_services(snapshot, query)
     task_matches = matching_scheduled_tasks(snapshot, query)
+    autorun_matches = matching_registry_autoruns(snapshot, query)
 
     print_inspect_header(snapshot, query)
 
-    if not process_matches and not service_matches and not task_matches:
-        print(error("No matching processes, services, or scheduled tasks found."))
+    if not process_matches and not service_matches and not task_matches and not autorun_matches:
+        print(error("No matching processes, services, scheduled tasks, or registry autoruns found."))
         print()
         return
 
@@ -120,11 +140,14 @@ def print_process_inspection(snapshot, query, details=False):
     service_start_modes = Counter(service.get("StartMode") or "Unknown" for service in service_matches)
     task_names = Counter(task_name(task) for task in task_matches)
     task_states = Counter(task.get("State") or "Unknown" for task in task_matches)
+    autorun_names = Counter(autorun_name(autorun) for autorun in autorun_matches)
+    autorun_hives = Counter(autorun.get("Hive") or "Unknown" for autorun in autorun_matches)
 
     print(bold("Summary"))
     print(f"  {'Matching processes':<22} {len(process_matches)}")
     print(f"  {'Matching services':<22} {len(service_matches)}")
     print(f"  {'Matching tasks':<22} {len(task_matches)}")
+    print(f"  {'Matching autoruns':<22} {len(autorun_matches)}")
     print(f"  {'Unique names':<22} {len(names)}")
     print(f"  {'Unique paths':<22} {len(paths)}")
     print(f"  {'Parent PIDs':<22} {len(parent_pids)}")
@@ -175,8 +198,19 @@ def print_process_inspection(snapshot, query, details=False):
             print(f"  {state:<20} {count}")
         print()
 
+    if autorun_matches:
+        print(bold("Registry Autoruns"))
+        for name, count in autorun_names.most_common():
+            print(f"  {name:<50} {count}")
+        print()
+
+        print(bold("Registry Autorun Hives"))
+        for hive, count in autorun_hives.most_common():
+            print(f"  {hive:<20} {count}")
+        print()
+
     if not details:
-        print(bold("Use --details to view full process, service, and scheduled task entries."))
+        print(bold("Use --details to view full process, service, scheduled task, and registry autorun entries."))
         print()
         return
 
@@ -205,4 +239,13 @@ def print_process_inspection(snapshot, query, details=False):
             print(info(rule(INSPECT_WIDTH, "─")))
             print()
             print_scheduled_task(task)
+            print()
+
+    if autorun_matches:
+        print(bold("Registry Autorun Entries"))
+        print()
+        for autorun in autorun_matches:
+            print(info(rule(INSPECT_WIDTH, "─")))
+            print()
+            print_registry_autorun(autorun)
             print()

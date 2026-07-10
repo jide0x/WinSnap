@@ -1,4 +1,4 @@
-from src.collectors.powershell import run_powershell_json
+from winsnap.collectors.powershell import run_powershell_json
 
 
 SERVICE_COLLECTION_TIMEOUT_SECONDS = 30

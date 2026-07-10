@@ -1,4 +1,4 @@
-from src.collectors.powershell import run_powershell_json
+from winsnap.collectors.powershell import run_powershell_json
 
 
 SCHEDULED_TASK_COLLECTION_TIMEOUT_SECONDS = 30

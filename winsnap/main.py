@@ -1,4 +1,4 @@
-from src.commands import (
+from winsnap.commands import (
     create_snapshot,
     diff_snapshots,
     inspect_snapshot,

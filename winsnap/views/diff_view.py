@@ -1,7 +1,8 @@
 from collections import Counter
 
-from src.views.process_view import print_process
-from src.views.ui import success, error, info, bold, rule
+from winsnap.risk_hints import registry_autorun_risk_hints, scheduled_task_risk_hints, service_risk_hints
+from winsnap.views.process_view import print_process
+from winsnap.views.ui import success, error, info, bold, rule
 
 
 DIFF_WIDTH = 46
@@ -43,6 +44,7 @@ def print_diff_summary(before, after, diff):
     process_diff = diff["processes"]
     service_diff = diff["services"]
     task_diff = diff["scheduled_tasks"]
+    autorun_diff = diff["registry_autoruns"]
     added = process_diff["added"]
     removed = process_diff["removed"]
     added_counts = Counter(process_name(process) for process in added)
@@ -65,6 +67,8 @@ def print_diff_summary(before, after, diff):
     )
 
     print_diff_header(before, after)
+    print_compatibility(diff)
+
     print(bold("Summary"))
     print(f"  {'Added process instances':<27} {len(added)}")
     print(f"  {'Removed process instances':<27} {len(removed)}")
@@ -74,6 +78,9 @@ def print_diff_summary(before, after, diff):
     print(f"  {'Added scheduled tasks':<27} {len(task_diff['added'])}")
     print(f"  {'Removed scheduled tasks':<27} {len(task_diff['removed'])}")
     print(f"  {'Changed scheduled tasks':<27} {len(task_diff['changed'])}")
+    print(f"  {'Added registry autoruns':<27} {len(autorun_diff['added'])}")
+    print(f"  {'Removed registry autoruns':<27} {len(autorun_diff['removed'])}")
+    print(f"  {'Changed registry autoruns':<27} {len(autorun_diff['changed'])}")
     print()
 
     print(bold("Top Changed Apps"))
@@ -125,16 +132,31 @@ def print_diff_summary(before, after, diff):
     else:
         print("  None")
     print()
-    print(bold("Use --details to view full process, service, and scheduled task entries."))
+
+    print(bold("Registry Autorun Changes"))
+    if autorun_diff["added"] or autorun_diff["removed"] or autorun_diff["changed"]:
+        for autorun in autorun_diff["added"][:10]:
+            print(f"  + {autorun_name(autorun)}")
+        for autorun in autorun_diff["removed"][:10]:
+            print(f"  - {autorun_name(autorun)}")
+        for item in autorun_diff["changed"][:10]:
+            fields = ", ".join(item["changes"].keys())
+            print(f"  ~ {autorun_name(item['after'])} ({fields})")
+    else:
+        print("  None")
+    print()
+    print(bold("Use --details to view full process, service, scheduled task, and registry autorun entries."))
     print()
 
 # Prints detailed diff report (full process entries)
 def print_detailed_diff(before, after, diff):
     print_diff_header(before, after)
+    print_compatibility(diff)
 
     process_diff = diff["processes"]
     service_diff = diff["services"]
     task_diff = diff["scheduled_tasks"]
+    autorun_diff = diff["registry_autoruns"]
 
     print(success(f"Added Processes ({len(process_diff['added'])})"))
     print()
@@ -219,6 +241,49 @@ def print_detailed_diff(before, after, diff):
             print(f"    After : {format_task_value(values['after'])}")
         print()
 
+    print()
+    print(success(f"Added Registry Autoruns ({len(autorun_diff['added'])})"))
+    print()
+    for autorun in autorun_diff["added"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_registry_autorun(autorun)
+        print()
+
+    print()
+    print(error(f"Removed Registry Autoruns ({len(autorun_diff['removed'])})"))
+    print()
+    for autorun in autorun_diff["removed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_registry_autorun(autorun)
+        print()
+
+    print()
+    print(bold(f"Changed Registry Autoruns ({len(autorun_diff['changed'])})"))
+    print()
+    for item in autorun_diff["changed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_registry_autorun(item["after"])
+        print()
+        print(bold(" Changes"))
+        for field, values in item["changes"].items():
+            print(f"  {field}")
+            print(f"    Before: {values['before']}")
+            print(f"    After : {values['after']}")
+        print()
+
+
+def print_compatibility(diff):
+    print(bold("Compatibility"))
+    for item in diff.get("compatibility", []):
+        if item["status"] == "compared":
+            print(f"  {item['label']} compared")
+        else:
+            print(f"  {item['label']} skipped: {item['reason']}")
+    print()
+
 
 def service_name(service):
     name = service.get("Name") or "Unknown"
@@ -245,38 +310,6 @@ def print_service(service):
         print(bold(" Risk Hints"))
         for hint in hints:
             print(f"  ! {hint}")
-
-
-def service_risk_hints(service):
-    hints = []
-    start_mode = (service.get("StartMode") or "").lower()
-    start_name = (service.get("StartName") or "").lower()
-    path_name = service.get("PathName")
-    normalized_path = (path_name or "").lower().replace("/", "\\")
-
-    if start_mode == "auto":
-        hints.append("Auto-start service")
-
-    if start_name in {"localsystem", "local system"}:
-        hints.append("Runs as LocalSystem")
-
-    if not path_name:
-        hints.append("Missing/unknown PathName")
-    elif is_user_writable_path(normalized_path):
-        hints.append("Path in user-writable location")
-
-    return hints
-
-
-def is_user_writable_path(path):
-    user_writable_markers = [
-        "\\users\\",
-        "\\appdata\\",
-        "\\temp\\",
-        "\\tmp\\",
-        "\\programdata\\",
-    ]
-    return any(marker in path for marker in user_writable_markers)
 
 
 def task_name(task):
@@ -308,46 +341,26 @@ def print_scheduled_task(task):
             print(f"  ! {hint}")
 
 
-def scheduled_task_risk_hints(task):
-    hints = []
-    state = str(task.get("State") or "").lower()
-    run_as_user = str(task.get("RunAsUser") or "").lower()
-    triggers = " ".join(task_values(task.get("Triggers"))).lower()
-    actions = " ".join(task_values(task.get("Actions"))).lower().replace("/", "\\")
-
-    if state in {"ready", "running"}:
-        hints.append("Enabled scheduled task")
-
-    if run_as_user in {"system", "localsystem", "local system", "nt authority\\system"}:
-        hints.append("Runs as SYSTEM")
-
-    if "logon" in triggers:
-        hints.append("Runs at logon")
-
-    if "startup" in triggers or "boot" in triggers:
-        hints.append("Runs at startup")
-
-    if any(marker in actions for marker in suspicious_action_markers()):
-        hints.append("Executes command or scripting host")
-
-    if is_user_writable_path(actions):
-        hints.append("Action path in user-writable location")
-
-    return hints
+def autorun_name(autorun):
+    value_name = autorun.get("ValueName") or "Unknown"
+    key_path = autorun.get("KeyPath") or "Unknown"
+    return f"{key_path}\\{value_name}"
 
 
-def suspicious_action_markers():
-    return [
-        "powershell",
-        "pwsh",
-        "cmd.exe",
-        "wscript",
-        "cscript",
-        "mshta",
-        "rundll32",
-        "regsvr32",
-        "schtasks",
-    ]
+def print_registry_autorun(autorun):
+    print(bold(autorun_name(autorun)))
+    print()
+    print(f" Hive        {autorun.get('Hive') or 'Unknown'}")
+    print(f" Key Path    {autorun.get('KeyPath') or 'Unknown'}")
+    print(f" Value Name  {autorun.get('ValueName') or 'Unknown'}")
+    print(f" Value       {autorun.get('Value') or 'Unknown'}")
+
+    hints = registry_autorun_risk_hints(autorun)
+    if hints:
+        print()
+        print(bold(" Risk Hints"))
+        for hint in hints:
+            print(f"  ! {hint}")
 
 
 def task_values(value):

@@ -13,6 +13,10 @@ def scheduled_task_key(task):
     return f"{task.get('TaskPath') or ''}|{task.get('TaskName') or ''}".lower()
 
 
+def registry_autorun_key(autorun):
+    return f"{autorun.get('Hive') or ''}|{autorun.get('KeyPath') or ''}|{autorun.get('ValueName') or ''}".lower()
+
+
 def group_processes(processes):
     grouped = defaultdict(list)
     for process in processes:
@@ -142,5 +146,54 @@ def scheduled_task_changes(before_task, after_task):
                 "before": before_value,
                 "after": after_value,
             }
+
+    return changes
+
+
+def diff_registry_autoruns(before, after):
+    before_autoruns = {
+        registry_autorun_key(autorun): autorun
+        for autorun in before.get("registry_autoruns", [])
+        if registry_autorun_key(autorun)
+    }
+    after_autoruns = {
+        registry_autorun_key(autorun): autorun
+        for autorun in after.get("registry_autoruns", [])
+        if registry_autorun_key(autorun)
+    }
+
+    added_keys = after_autoruns.keys() - before_autoruns.keys()
+    removed_keys = before_autoruns.keys() - after_autoruns.keys()
+    common_keys = before_autoruns.keys() & after_autoruns.keys()
+
+    changed = []
+    for key in sorted(common_keys):
+        before_autorun = before_autoruns[key]
+        after_autorun = after_autoruns[key]
+        changes = registry_autorun_changes(before_autorun, after_autorun)
+        if changes:
+            changed.append({
+                "before": before_autorun,
+                "after": after_autorun,
+                "changes": changes,
+            })
+
+    return {
+        "added": [after_autoruns[key] for key in sorted(added_keys)],
+        "removed": [before_autoruns[key] for key in sorted(removed_keys)],
+        "changed": changed,
+    }
+
+
+def registry_autorun_changes(before_autorun, after_autorun):
+    changes = {}
+
+    before_value = before_autorun.get("Value")
+    after_value = after_autorun.get("Value")
+    if before_value != after_value:
+        changes["Value"] = {
+            "before": before_value,
+            "after": after_value,
+        }
 
     return changes

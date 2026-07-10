@@ -5,23 +5,47 @@ WinSnap is a lightweight Windows snapshot and change-analysis CLI.
 
 It captures selected Windows system state, saves it as JSON, and helps you compare snapshots to understand what changed over time.
 
-Current version: `0.5`
+Current version: `0.5.1`
+
+Installation
+------------
+
+From the project folder:
+
+```bash
+python -m pip install .
+```
+
+For development, install in editable mode:
+
+```bash
+python -m pip install -e .
+```
+
+After installation, run:
+
+```bash
+winsnap --help
+```
 
 Current collectors:
 
 - Processes
 - Services
 - Scheduled tasks
+- Registry autoruns
 
 Core Workflow
 -------------
 
 ```bash
-python winsnap create before --note "clean system"
-python winsnap create after --note "after install"
-python winsnap diff before after
-python winsnap diff before after --details
+winsnap create before --note "clean system"
+winsnap create after --note "after install"
+winsnap diff before after
+winsnap diff before after --details
 ```
+
+Without installing, you can run WinSnap from the project folder with `python -m winsnap ...` or `./winsnap.cmd ...`.
 
 Commands
 --------
@@ -29,73 +53,73 @@ Commands
 Create a snapshot:
 
 ```bash
-python winsnap create <name>
+winsnap create <name>
 ```
 
 Create a snapshot with a note:
 
 ```bash
-python winsnap create <name> --note "your note"
+winsnap create <name> --note "your note"
 ```
 
 List snapshots:
 
 ```bash
-python winsnap list
+winsnap list
 ```
 
 Show snapshot metadata:
 
 ```bash
-python winsnap show <name>
+winsnap show <name>
 ```
 
 Compare snapshots:
 
 ```bash
-python winsnap diff <before> <after>
+winsnap diff <before> <after>
 ```
 
 Show detailed diff output:
 
 ```bash
-python winsnap diff <before> <after> --details
+winsnap diff <before> <after> --details
 ```
 
 Inspect matching entries inside one snapshot:
 
 ```bash
-python winsnap inspect <snapshot> <query>
-python winsnap inspect <snapshot> <query> --details
+winsnap inspect <snapshot> <query>
+winsnap inspect <snapshot> <query> --details
 ```
 
 Search all snapshots:
 
 ```bash
-python winsnap search <query>
-python winsnap search <query> --details
+winsnap search <query>
+winsnap search <query> --details
 ```
 
 Delete a snapshot:
 
 ```bash
-python winsnap delete <name>
+winsnap delete <name>
 ```
 
 Show version:
 
 ```bash
-python winsnap version
-python winsnap --version
-python winsnap -v
+winsnap version
+winsnap --version
+winsnap -v
 ```
 
 Show help:
 
 ```bash
-python winsnap help
-python winsnap --help
-python winsnap -h
+winsnap help
+winsnap --help
+winsnap -h
 ```
 
 Service Risk Hints
@@ -107,6 +131,20 @@ Detailed service output can show risk hints such as:
 - Runs as LocalSystem
 - Path in user-writable location
 - Missing/unknown PathName
+
+These are not detections by themselves. They are context clues that help you decide what deserves closer inspection.
+
+Registry Autorun Risk Hints
+---------------------------
+
+Detailed registry autorun output can show risk hints such as:
+
+- Run key persistence location
+- RunOnce persistence location
+- Machine-wide autorun
+- Executes command or scripting host
+- Autorun path in user-writable location
+- Missing/empty autorun command
 
 These are not detections by themselves. They are context clues that help you decide what deserves closer inspection.
 
@@ -137,6 +175,18 @@ Scheduled task snapshots currently collect:
 - Triggers
 - Actions
 
+Registry Autorun Collection
+---------------------------
+
+Registry autorun snapshots currently collect Run and RunOnce values from:
+
+- `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+- `HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce`
+- `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`
+- `HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce`
+- `HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run`
+- `HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce`
+
 Snapshot Storage
 ----------------
 
@@ -156,7 +206,6 @@ WinSnap is being built toward local Windows security change analysis: capture sy
 
 Planned future collectors may include:
 
-- Registry run keys
 - Startup folders
 - Network connections
 - Defender settings

@@ -1,7 +1,8 @@
 import unittest
 
-from src.differ import diff_scheduled_tasks, diff_services
-from src.views.diff_view import scheduled_task_risk_hints, service_risk_hints
+from winsnap.commands.diff import compatibility_report, diff_if_compatible
+from winsnap.differ import diff_registry_autoruns, diff_scheduled_tasks, diff_services
+from winsnap.risk_hints import registry_autorun_risk_hints, scheduled_task_risk_hints, service_risk_hints
 
 
 class ServiceDiffTests(unittest.TestCase):
@@ -101,6 +102,94 @@ class ScheduledTaskRiskHintTests(unittest.TestCase):
         self.assertIn("Executes command or scripting host", hints)
 
 
+class RegistryAutorunDiffTests(unittest.TestCase):
+    def test_diff_registry_autoruns_added_removed_and_changed(self):
+        before = {
+            "registry_autoruns": [
+                registry_autorun("OldValue"),
+                registry_autorun("ChangedValue", Value="old.exe"),
+            ]
+        }
+        after = {
+            "registry_autoruns": [
+                registry_autorun("NewValue"),
+                registry_autorun("ChangedValue", Value="new.exe"),
+            ]
+        }
+
+        diff = diff_registry_autoruns(before, after)
+
+        self.assertEqual([autorun["ValueName"] for autorun in diff["added"]], ["NewValue"])
+        self.assertEqual([autorun["ValueName"] for autorun in diff["removed"]], ["OldValue"])
+        self.assertEqual(diff["changed"][0]["after"]["ValueName"], "ChangedValue")
+        self.assertEqual(
+            diff["changed"][0]["changes"]["Value"],
+            {"before": "old.exe", "after": "new.exe"},
+        )
+
+
+class RegistryAutorunRiskHintTests(unittest.TestCase):
+    def test_registry_autorun_risk_hints(self):
+        hints = registry_autorun_risk_hints(
+            registry_autorun(
+                "SuspiciousRun",
+                Hive="HKLM",
+                Value="C:\\Users\\Public\\runner.exe",
+            )
+        )
+
+        self.assertIn("Run key persistence location", hints)
+        self.assertIn("Machine-wide autorun", hints)
+        self.assertIn("Autorun path in user-writable location", hints)
+
+    def test_registry_autorun_runonce_and_command_host_hints(self):
+        hints = registry_autorun_risk_hints(
+            registry_autorun(
+                "OneShot",
+                KeyPath="HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
+                Value="powershell.exe -EncodedCommand abc",
+            )
+        )
+
+        self.assertIn("RunOnce persistence location", hints)
+        self.assertIn("Executes command or scripting host", hints)
+
+
+class CompatibilityTests(unittest.TestCase):
+    def test_compatibility_report_marks_missing_before_collectors_as_skipped(self):
+        before = {"processes": []}
+        after = {
+            "processes": [],
+            "services": [],
+            "scheduled_tasks": [],
+            "registry_autoruns": [],
+        }
+
+        report = compatibility_report(before, after)
+
+        self.assertEqual(report[0], {"label": "Processes", "status": "compared"})
+        self.assertEqual(
+            report[1],
+            {"label": "Services", "status": "skipped", "reason": "not present in before snapshot"},
+        )
+        self.assertEqual(
+            report[2],
+            {"label": "Scheduled Tasks", "status": "skipped", "reason": "not present in before snapshot"},
+        )
+        self.assertEqual(
+            report[3],
+            {"label": "Registry Autoruns", "status": "skipped", "reason": "not present in before snapshot"},
+        )
+
+    def test_diff_if_compatible_skips_missing_collector(self):
+        before = {}
+        after = {"services": [service("newsvc")]}
+
+        diff = diff_if_compatible(before, after, "services", diff_services)
+
+        self.assertEqual(diff, {"added": [], "removed": [], "changed": []})
+
+
 def service(name, **overrides):
     data = {
         "Name": name,
@@ -125,6 +214,17 @@ def scheduled_task(name, **overrides):
         "RunAsUser": "SYSTEM",
         "Triggers": ["At log on"],
         "Actions": ["C:\\Windows\\System32\\cmd.exe /c echo test"],
+    }
+    data.update(overrides)
+    return data
+
+
+def registry_autorun(name, **overrides):
+    data = {
+        "Hive": "HKCU",
+        "KeyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+        "ValueName": name,
+        "Value": "C:\\Program Files\\Example\\example.exe",
     }
     data.update(overrides)
     return data

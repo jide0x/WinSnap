@@ -19,6 +19,7 @@ Current collectors:
 * Processes
 * Services
 * Scheduled tasks
+* Registry autoruns
 
 Current service risk hints:
 
@@ -35,6 +36,15 @@ Current scheduled task risk hints:
 * Runs at startup
 * Executes command or scripting host
 * Action path in user-writable location
+
+Current registry autorun risk hints:
+
+* Run key persistence location
+* RunOnce persistence location
+* Machine-wide autorun
+* Executes command or scripting host
+* Autorun path in user-writable location
+* Missing/empty autorun command
 
 These hints currently appear only in detailed diff output to avoid cluttering the default summary.
 
@@ -110,8 +120,6 @@ The score should be used internally to prioritize findings. The user-facing outp
 ---
 
 ## Registry Risk Indicators
-
-Future collector.
 
 | Indicator             | Suggested Weight | Why It Matters                                          |
 | --------------------- | ---------------: | ------------------------------------------------------- |

@@ -3,11 +3,11 @@ import getpass
 import platform
 import socket
 
-from src.collectors import collect_processes, collect_scheduled_tasks, collect_services
-from src.snapshot_store import delete_snapshot, list_snapshots, load_snapshot, save_snapshot, snapshot_path
-from src.version import VERSION
-from src.views.snapshot_view import print_snapshot_list, print_snapshot_summary
-from src.views.ui import success, warning
+from winsnap.collectors import collect_processes, collect_registry_autoruns, collect_scheduled_tasks, collect_services
+from winsnap.snapshot_store import delete_snapshot, list_snapshots, load_snapshot, save_snapshot, snapshot_path
+from winsnap.version import VERSION
+from winsnap.views.snapshot_view import print_snapshot_list, print_snapshot_summary
+from winsnap.views.ui import success, warning
 
 
 def create_snapshot(name, note=""):
@@ -28,11 +28,12 @@ def create_snapshot(name, note=""):
         "username": getpass.getuser(),
         "windows_version": platform.platform(),
         "created_at": datetime.now().isoformat(timespec="seconds"),
-        "collector": ["processes", "services", "scheduled_tasks"],
+        "collector": ["processes", "services", "scheduled_tasks", "registry_autoruns"],
         "note": note,
         "processes": collect_processes(),
         "services": collect_services(),
         "scheduled_tasks": collect_scheduled_tasks(),
+        "registry_autoruns": collect_registry_autoruns(),
     }
 
     save_snapshot(snapshot)

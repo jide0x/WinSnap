@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from src.main import (
+from winsnap.commands import (
     create_snapshot,
     diff_snapshots,
     inspect_snapshot,
@@ -10,9 +10,9 @@ from src.main import (
     show_snapshot,
     remove_snapshot,
 )
-from src.snapshot_store import list_snapshots
-from src.views.ui import error, info
-from src.version import VERSION
+from winsnap.snapshot_store import list_snapshots
+from winsnap.views.ui import error, info
+from winsnap.version import VERSION
 
 
 class WinSnapArgumentParser(argparse.ArgumentParser):
@@ -22,28 +22,29 @@ class WinSnapArgumentParser(argparse.ArgumentParser):
 
 def build_parser():
     parser = WinSnapArgumentParser(
-        prog="python winsnap",
+        prog="winsnap",
         description="WinSnap - lightweight Windows snapshot and change analysis.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Workflow:
-  python winsnap create before --note "clean system"
-  python winsnap create after --note "after install"
-  python winsnap diff before after
-  python winsnap diff before after --details
+  winsnap create before --note "clean system"
+  winsnap create after --note "after install"
+  winsnap diff before after
+  winsnap diff before after --details
 
 Examples:
-  python winsnap list
-  python winsnap show before
-  python winsnap inspect before firefox
-  python winsnap inspect before LocalSystem --details
-  python winsnap search firefox
-  python winsnap search LocalSystem --details
+  winsnap list
+  winsnap show before
+  winsnap inspect before firefox
+  winsnap inspect before LocalSystem --details
+  winsnap search firefox
+  winsnap search LocalSystem --details
 
 Collectors:
   processes
   services
   scheduled tasks
+  registry autoruns
 """,
     )
     parser.add_argument(
@@ -55,7 +56,7 @@ Collectors:
 
     subparsers = parser.add_subparsers(dest="command", parser_class=WinSnapArgumentParser)
 
-    create_parser = subparsers.add_parser("create", help="Create a process/service/scheduled task snapshot")
+    create_parser = subparsers.add_parser("create", help="Create a process/service/scheduled task/registry autorun snapshot")
     create_parser.add_argument("name")
     create_parser.add_argument("--note", default="", help="Add a note to the snapshot")
 
@@ -64,12 +65,12 @@ Collectors:
     diff_parser.add_argument("after")
     diff_parser.add_argument("--details", action="store_true", help="Show detailed process changes")
 
-    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services/scheduled tasks in one snapshot")
+    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services/scheduled tasks/registry autoruns in one snapshot")
     inspect_parser.add_argument("snapshot")
     inspect_parser.add_argument("query")
     inspect_parser.add_argument("--details", action="store_true", help="Show detailed matching entries")
 
-    search_parser = subparsers.add_parser("search", help="Search all snapshots for processes/services/scheduled tasks")
+    search_parser = subparsers.add_parser("search", help="Search all snapshots for processes/services/scheduled tasks/registry autoruns")
     search_parser.add_argument("query")
     search_parser.add_argument("--details", action="store_true", help="Show detailed matches across snapshots")
 
@@ -151,14 +152,14 @@ def main():
         args = parser.parse_args()
         run_command(args, parser)
     except FileNotFoundError as e:
-        print(error(f"❌ {e}"))
+        print(error(f"Error: {e}"))
         print_existing_snapshots()
     except ValueError as e:
-        print(error(f"❌ {e}"))
+        print(error(f"Error: {e}"))
     except KeyboardInterrupt:
-        print(error("\n❌ Operation cancelled."))
+        print(error("\nOperation cancelled."))
     except Exception as e:
-        print(error(f"❌ Error: {e}"))
+        print(error(f"Error: {e}"))
 
 
 if __name__ == "__main__":

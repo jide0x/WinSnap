@@ -3,7 +3,7 @@ import shutil
 import shlex
 import textwrap
 
-from src.views.ui import bold
+from winsnap.views.ui import bold
 
 
 FIELD_LABEL_WIDTH = 12

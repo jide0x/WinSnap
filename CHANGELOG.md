@@ -1,16 +1,28 @@
 # Changelog
 
+## 0.5.1
+
+- Packaged WinSnap as an installable Python project with a `winsnap` console command.
+- Renamed the import package from `src` to `winsnap`.
+- Added `python -m winsnap` support.
+- Added package install and CLI smoke checks to CI.
+- Moved risk-hint logic out of terminal rendering code.
+
 ## 0.5
 
 - Reorganized command handlers into `src/commands/` and terminal rendering into `src/views/`.
 - Reorganized collectors into dedicated modules under `src/collectors/`.
 - Added scheduled task collection.
+- Added registry autorun collection for Run and RunOnce persistence keys.
+- Added diff compatibility reporting and skipped comparisons for collectors missing from older snapshots.
+- Added a Windows `winsnap.cmd` launcher for direct `winsnap ...` command usage.
 - Added scheduled task counts to `show` and `list`.
 - Added scheduled task changes to `diff` summary output.
 - Added scheduled task entries to `diff --details`.
 - Added scheduled task risk hints for enabled tasks, SYSTEM tasks, logon/startup triggers, command/script hosts, and user-writable action paths.
-- Expanded `inspect` to search processes, services, and scheduled tasks.
-- Expanded `search` to search processes, services, and scheduled tasks across snapshots.
+- Added registry autorun risk hints for Run/RunOnce persistence, machine-wide autoruns, command/script hosts, user-writable paths, and missing commands.
+- Expanded `inspect` to search processes, services, scheduled tasks, and registry autoruns.
+- Expanded `search` to search processes, services, scheduled tasks, and registry autoruns across snapshots.
 
 ## 0.4
 

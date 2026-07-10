@@ -2,3 +2,8 @@ __pycache__/
 *.pyc
 .venv/
 snapshots/
+diff.txt
+tree.txt
+*.egg-info/
+build/
+dist/

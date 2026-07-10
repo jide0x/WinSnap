@@ -1,5 +1,5 @@
-from src.snapshot_store import load_snapshot
-from src.views.inspect_view import print_process_inspection
+from winsnap.snapshot_store import load_snapshot
+from winsnap.views.inspect_view import print_process_inspection
 
 
 def inspect_snapshot(name, query, details=False):
