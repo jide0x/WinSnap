@@ -1,4 +1,4 @@
-from winsnap.differ import diff_processes, diff_registry_autoruns, diff_scheduled_tasks, diff_services
+from winsnap.differ import diff_processes, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
 from winsnap.snapshot_store import load_snapshot
 from winsnap.views.diff_view import print_detailed_diff, print_diff_summary
 
@@ -8,6 +8,7 @@ COLLECTORS = {
     "services": "Services",
     "scheduled_tasks": "Scheduled Tasks",
     "registry_autoruns": "Registry Autoruns",
+    "startup_folders": "Startup Folders",
 }
 
 EMPTY_DIFF = {"added": [], "removed": [], "changed": []}
@@ -22,6 +23,7 @@ def diff_snapshots(before_name, after_name, details=False):
         "services": diff_if_compatible(before, after, "services", diff_services),
         "scheduled_tasks": diff_if_compatible(before, after, "scheduled_tasks", diff_scheduled_tasks),
         "registry_autoruns": diff_if_compatible(before, after, "registry_autoruns", diff_registry_autoruns),
+        "startup_folders": diff_if_compatible(before, after, "startup_folders", diff_startup_folders),
         "compatibility": compatibility_report(before, after),
     }
 

@@ -5,7 +5,7 @@ WinSnap is a lightweight Windows snapshot and change-analysis CLI.
 
 It captures selected Windows system state, saves it as JSON, and helps you compare snapshots to understand what changed over time.
 
-Current version: `0.5.2`
+Current version: `0.6`
 
 Installation
 ------------
@@ -34,6 +34,7 @@ Current collectors:
 - Services
 - Scheduled tasks
 - Registry autoruns
+- Startup folders
 
 Core Workflow
 -------------
@@ -127,7 +128,7 @@ Risk Hints
 
 Risk hints are currently archived while filtering is developed to reduce noisy output.
 
-Snapshots still collect processes, services, scheduled tasks, and registry autoruns. Diff, inspect, and search output continues to show raw changes and matching entries without risk-hint labels.
+Snapshots still collect processes, services, scheduled tasks, registry autoruns, and startup folder entries. Diff, inspect, and search output continues to show raw changes and matching entries without risk-hint labels.
 
 Scheduled Task Collection
 -------------------------
@@ -154,6 +155,16 @@ Registry autorun snapshots currently collect Run and RunOnce values from:
 - `HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run`
 - `HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce`
 
+Startup Folder Collection
+-------------------------
+
+Startup folder snapshots currently collect direct files from:
+
+- `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`
+- `%PROGRAMDATA%\Microsoft\Windows\Start Menu\Programs\Startup`
+
+Shortcut (`.lnk`) entries include target path, arguments, and working directory when available.
+
 Snapshot Storage
 ----------------
 
@@ -173,6 +184,5 @@ WinSnap is being built toward local Windows security change analysis: capture sy
 
 Planned future collectors may include:
 
-- Startup folders
 - Network connections
 - Defender settings

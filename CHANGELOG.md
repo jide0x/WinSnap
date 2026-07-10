@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6
+
+- Added startup folder collection for user and machine-wide Startup folders.
+- Added startup folder counts to `show` and `list`.
+- Added startup folder changes to `diff` summary and detailed output.
+- Expanded `inspect` and `search` to include startup folder entries.
+- Added startup folder diff tests and compatibility reporting.
+
 ## 0.5.2
 
 - Archived risk-hint output while filtering is developed to reduce noise.

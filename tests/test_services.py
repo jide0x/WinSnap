@@ -1,7 +1,7 @@
 import unittest
 
 from winsnap.commands.diff import compatibility_report, diff_if_compatible
-from winsnap.differ import diff_registry_autoruns, diff_scheduled_tasks, diff_services
+from winsnap.differ import diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
 
 
 class ServiceDiffTests(unittest.TestCase):
@@ -82,6 +82,32 @@ class RegistryAutorunDiffTests(unittest.TestCase):
         )
 
 
+class StartupFolderDiffTests(unittest.TestCase):
+    def test_diff_startup_folders_added_removed_and_changed(self):
+        before = {
+            "startup_folders": [
+                startup_item("OldItem.lnk"),
+                startup_item("ChangedItem.lnk", TargetPath="old.exe"),
+            ]
+        }
+        after = {
+            "startup_folders": [
+                startup_item("NewItem.lnk"),
+                startup_item("ChangedItem.lnk", TargetPath="new.exe"),
+            ]
+        }
+
+        diff = diff_startup_folders(before, after)
+
+        self.assertEqual([item["Name"] for item in diff["added"]], ["NewItem.lnk"])
+        self.assertEqual([item["Name"] for item in diff["removed"]], ["OldItem.lnk"])
+        self.assertEqual(diff["changed"][0]["after"]["Name"], "ChangedItem.lnk")
+        self.assertEqual(
+            diff["changed"][0]["changes"]["TargetPath"],
+            {"before": "old.exe", "after": "new.exe"},
+        )
+
+
 class CompatibilityTests(unittest.TestCase):
     def test_compatibility_report_marks_missing_before_collectors_as_skipped(self):
         before = {"processes": []}
@@ -90,6 +116,7 @@ class CompatibilityTests(unittest.TestCase):
             "services": [],
             "scheduled_tasks": [],
             "registry_autoruns": [],
+            "startup_folders": [],
         }
 
         report = compatibility_report(before, after)
@@ -106,6 +133,10 @@ class CompatibilityTests(unittest.TestCase):
         self.assertEqual(
             report[3],
             {"label": "Registry Autoruns", "status": "skipped", "reason": "not present in before snapshot"},
+        )
+        self.assertEqual(
+            report[4],
+            {"label": "Startup Folders", "status": "skipped", "reason": "not present in before snapshot"},
         )
 
     def test_diff_if_compatible_skips_missing_collector(self):
@@ -152,6 +183,23 @@ def registry_autorun(name, **overrides):
         "KeyPath": "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
         "ValueName": name,
         "Value": "C:\\Program Files\\Example\\example.exe",
+    }
+    data.update(overrides)
+    return data
+
+
+def startup_item(name, **overrides):
+    data = {
+        "Scope": "User",
+        "FolderPath": "C:\\Users\\Example\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup",
+        "Name": name,
+        "FullName": f"C:\\Users\\Example\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\{name}",
+        "Extension": ".lnk",
+        "Length": 123,
+        "LastWriteTimeUtc": "2026-07-10T00:00:00.0000000Z",
+        "TargetPath": "C:\\Program Files\\Example\\example.exe",
+        "Arguments": "",
+        "WorkingDirectory": "C:\\Program Files\\Example",
     }
     data.update(overrides)
     return data

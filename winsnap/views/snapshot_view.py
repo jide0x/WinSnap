@@ -4,7 +4,7 @@ from winsnap.views.ui import success, warning, info, bold, rule
 
 
 BOX_WIDTH = 38
-LIST_WIDTH = 96
+LIST_WIDTH = 104
 LIST_NAME_WIDTH = 20
 
 
@@ -28,6 +28,12 @@ def registry_autorun_count(snapshot):
     if "registry_autoruns" not in snapshot:
         return None
     return len(snapshot.get("registry_autoruns", []))
+
+
+def startup_folder_count(snapshot):
+    if "startup_folders" not in snapshot:
+        return None
+    return len(snapshot.get("startup_folders", []))
 
 
 def format_count(value):
@@ -97,6 +103,8 @@ def print_snapshot_summary(snapshot):
     print(f"Tasks         : {format_count(scheduled_task_count(snapshot))}")
     print()
     print(f"Autoruns      : {format_count(registry_autorun_count(snapshot))}")
+    print()
+    print(f"Startup Items : {format_count(startup_folder_count(snapshot))}")
     if snapshot_note(snapshot):
         print()
         print(f"Note          : {snapshot_note(snapshot)}")
@@ -120,7 +128,7 @@ def print_snapshot_list(snapshots):
     print()
     print(bold("Snapshots"))
     print()
-    print(f"{'Name':<{LIST_NAME_WIDTH}} {'Created':<22} {'Proc':>5} {'Svc':>5} {'Task':>5} {'Run':>5}  Note")
+    print(f"{'Name':<{LIST_NAME_WIDTH}} {'Created':<22} {'Proc':>5} {'Svc':>5} {'Task':>5} {'Run':>5} {'Start':>5}  Note")
     print()
     print("-" * LIST_WIDTH)
     print()
@@ -132,6 +140,7 @@ def print_snapshot_list(snapshots):
             f"{format_list_count(service_count(snap)):>5} "
             f"{format_list_count(scheduled_task_count(snap)):>5} "
             f"{format_list_count(registry_autorun_count(snap)):>5}  "
+            f"{format_list_count(startup_folder_count(snap)):>5}  "
             f"{snapshot_note(snap)}"
         )
     print()

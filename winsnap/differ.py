@@ -17,6 +17,10 @@ def registry_autorun_key(autorun):
     return f"{autorun.get('Hive') or ''}|{autorun.get('KeyPath') or ''}|{autorun.get('ValueName') or ''}".lower()
 
 
+def startup_folder_key(item):
+    return f"{item.get('Scope') or ''}|{item.get('FullName') or ''}".lower()
+
+
 def group_processes(processes):
     grouped = defaultdict(list)
     for process in processes:
@@ -195,5 +199,56 @@ def registry_autorun_changes(before_autorun, after_autorun):
             "before": before_value,
             "after": after_value,
         }
+
+    return changes
+
+
+def diff_startup_folders(before, after):
+    before_items = {
+        startup_folder_key(item): item
+        for item in before.get("startup_folders", [])
+        if startup_folder_key(item)
+    }
+    after_items = {
+        startup_folder_key(item): item
+        for item in after.get("startup_folders", [])
+        if startup_folder_key(item)
+    }
+
+    added_keys = after_items.keys() - before_items.keys()
+    removed_keys = before_items.keys() - after_items.keys()
+    common_keys = before_items.keys() & after_items.keys()
+
+    changed = []
+    for key in sorted(common_keys):
+        before_item = before_items[key]
+        after_item = after_items[key]
+        changes = startup_folder_changes(before_item, after_item)
+        if changes:
+            changed.append({
+                "before": before_item,
+                "after": after_item,
+                "changes": changes,
+            })
+
+    return {
+        "added": [after_items[key] for key in sorted(added_keys)],
+        "removed": [before_items[key] for key in sorted(removed_keys)],
+        "changed": changed,
+    }
+
+
+def startup_folder_changes(before_item, after_item):
+    fields = ["Name", "FullName", "Extension", "Length", "LastWriteTimeUtc", "TargetPath", "Arguments", "WorkingDirectory"]
+    changes = {}
+
+    for field in fields:
+        before_value = before_item.get(field)
+        after_value = after_item.get(field)
+        if before_value != after_value:
+            changes[field] = {
+                "before": before_value,
+                "after": after_value,
+            }
 
     return changes

@@ -44,6 +44,7 @@ def print_diff_summary(before, after, diff):
     service_diff = diff["services"]
     task_diff = diff["scheduled_tasks"]
     autorun_diff = diff["registry_autoruns"]
+    startup_diff = diff["startup_folders"]
     added = process_diff["added"]
     removed = process_diff["removed"]
     added_counts = Counter(process_name(process) for process in added)
@@ -80,6 +81,9 @@ def print_diff_summary(before, after, diff):
     print(f"  {'Added registry autoruns':<27} {len(autorun_diff['added'])}")
     print(f"  {'Removed registry autoruns':<27} {len(autorun_diff['removed'])}")
     print(f"  {'Changed registry autoruns':<27} {len(autorun_diff['changed'])}")
+    print(f"  {'Added startup items':<27} {len(startup_diff['added'])}")
+    print(f"  {'Removed startup items':<27} {len(startup_diff['removed'])}")
+    print(f"  {'Changed startup items':<27} {len(startup_diff['changed'])}")
     print()
 
     print(bold("Top Changed Apps"))
@@ -144,7 +148,20 @@ def print_diff_summary(before, after, diff):
     else:
         print("  None")
     print()
-    print(bold("Use --details to view full process, service, scheduled task, and registry autorun entries."))
+
+    print(bold("Startup Folder Changes"))
+    if startup_diff["added"] or startup_diff["removed"] or startup_diff["changed"]:
+        for item in startup_diff["added"][:10]:
+            print(f"  + {startup_item_name(item)}")
+        for item in startup_diff["removed"][:10]:
+            print(f"  - {startup_item_name(item)}")
+        for item in startup_diff["changed"][:10]:
+            fields = ", ".join(item["changes"].keys())
+            print(f"  ~ {startup_item_name(item['after'])} ({fields})")
+    else:
+        print("  None")
+    print()
+    print(bold("Use --details to view full process, service, scheduled task, registry autorun, and startup folder entries."))
     print()
 
 # Prints detailed diff report (full process entries)
@@ -156,6 +173,7 @@ def print_detailed_diff(before, after, diff):
     service_diff = diff["services"]
     task_diff = diff["scheduled_tasks"]
     autorun_diff = diff["registry_autoruns"]
+    startup_diff = diff["startup_folders"]
 
     print(success(f"Added Processes ({len(process_diff['added'])})"))
     print()
@@ -273,6 +291,39 @@ def print_detailed_diff(before, after, diff):
             print(f"    After : {values['after']}")
         print()
 
+    print()
+    print(success(f"Added Startup Items ({len(startup_diff['added'])})"))
+    print()
+    for item in startup_diff["added"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_startup_item(item)
+        print()
+
+    print()
+    print(error(f"Removed Startup Items ({len(startup_diff['removed'])})"))
+    print()
+    for item in startup_diff["removed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_startup_item(item)
+        print()
+
+    print()
+    print(bold(f"Changed Startup Items ({len(startup_diff['changed'])})"))
+    print()
+    for item in startup_diff["changed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_startup_item(item["after"])
+        print()
+        print(bold(" Changes"))
+        for field, values in item["changes"].items():
+            print(f"  {field}")
+            print(f"    Before: {values['before']}")
+            print(f"    After : {values['after']}")
+        print()
+
 
 def print_compatibility(diff):
     print(bold("Compatibility"))
@@ -337,6 +388,27 @@ def print_registry_autorun(autorun):
     print(f" Key Path    {autorun.get('KeyPath') or 'Unknown'}")
     print(f" Value Name  {autorun.get('ValueName') or 'Unknown'}")
     print(f" Value       {autorun.get('Value') or 'Unknown'}")
+
+
+def startup_item_name(item):
+    scope = item.get("Scope") or "Unknown"
+    name = item.get("Name") or "Unknown"
+    return f"{scope}: {name}"
+
+
+def print_startup_item(item):
+    print(bold(startup_item_name(item)))
+    print()
+    print(f" Scope       {item.get('Scope') or 'Unknown'}")
+    print(f" Name        {item.get('Name') or 'Unknown'}")
+    print(f" Folder      {item.get('FolderPath') or 'Unknown'}")
+    print(f" Full Path   {item.get('FullName') or 'Unknown'}")
+    print(f" Extension   {item.get('Extension') or 'Unknown'}")
+    print(f" Size        {item.get('Length') if item.get('Length') is not None else 'Unknown'}")
+    print(f" Modified    {item.get('LastWriteTimeUtc') or 'Unknown'}")
+    print(f" Target      {item.get('TargetPath') or 'Unknown'}")
+    print(f" Arguments   {item.get('Arguments') or 'None'}")
+    print(f" Working Dir {item.get('WorkingDirectory') or 'Unknown'}")
 
 def task_values(value):
     if value is None or value == "":

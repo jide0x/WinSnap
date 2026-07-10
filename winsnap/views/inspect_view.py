@@ -1,6 +1,6 @@
 from collections import Counter
 
-from winsnap.views.diff_view import autorun_name, print_registry_autorun, print_scheduled_task, print_service, service_name, task_name
+from winsnap.views.diff_view import autorun_name, print_registry_autorun, print_scheduled_task, print_service, print_startup_item, service_name, startup_item_name, task_name
 from winsnap.views.process_view import print_process
 from winsnap.views.ui import error, info, bold, rule
 
@@ -57,6 +57,21 @@ def registry_autorun_matches(autorun, query):
     return any(query in str(field).lower() for field in fields if field)
 
 
+def startup_folder_matches(item, query):
+    query = query.lower()
+    fields = [
+        item.get("Scope"),
+        item.get("FolderPath"),
+        item.get("Name"),
+        item.get("FullName"),
+        item.get("Extension"),
+        item.get("TargetPath"),
+        item.get("Arguments"),
+        item.get("WorkingDirectory"),
+    ]
+    return any(query in str(field).lower() for field in fields if field)
+
+
 def process_name(process):
     return process.get("Name") or "Unknown"
 
@@ -101,6 +116,14 @@ def matching_registry_autoruns(snapshot, query):
     ]
 
 
+def matching_startup_folders(snapshot, query):
+    return [
+        item
+        for item in snapshot.get("startup_folders", [])
+        if startup_folder_matches(item, query)
+    ]
+
+
 def print_inspect_header(snapshot, query):
     print()
     print(info(rule(INSPECT_WIDTH)))
@@ -119,11 +142,12 @@ def print_process_inspection(snapshot, query, details=False):
     service_matches = matching_services(snapshot, query)
     task_matches = matching_scheduled_tasks(snapshot, query)
     autorun_matches = matching_registry_autoruns(snapshot, query)
+    startup_matches = matching_startup_folders(snapshot, query)
 
     print_inspect_header(snapshot, query)
 
-    if not process_matches and not service_matches and not task_matches and not autorun_matches:
-        print(error("No matching processes, services, scheduled tasks, or registry autoruns found."))
+    if not process_matches and not service_matches and not task_matches and not autorun_matches and not startup_matches:
+        print(error("No matching processes, services, scheduled tasks, registry autoruns, or startup items found."))
         print()
         return
 
@@ -142,12 +166,15 @@ def print_process_inspection(snapshot, query, details=False):
     task_states = Counter(task.get("State") or "Unknown" for task in task_matches)
     autorun_names = Counter(autorun_name(autorun) for autorun in autorun_matches)
     autorun_hives = Counter(autorun.get("Hive") or "Unknown" for autorun in autorun_matches)
+    startup_names = Counter(startup_item_name(item) for item in startup_matches)
+    startup_scopes = Counter(item.get("Scope") or "Unknown" for item in startup_matches)
 
     print(bold("Summary"))
     print(f"  {'Matching processes':<22} {len(process_matches)}")
     print(f"  {'Matching services':<22} {len(service_matches)}")
     print(f"  {'Matching tasks':<22} {len(task_matches)}")
     print(f"  {'Matching autoruns':<22} {len(autorun_matches)}")
+    print(f"  {'Matching startup':<22} {len(startup_matches)}")
     print(f"  {'Unique names':<22} {len(names)}")
     print(f"  {'Unique paths':<22} {len(paths)}")
     print(f"  {'Parent PIDs':<22} {len(parent_pids)}")
@@ -209,8 +236,19 @@ def print_process_inspection(snapshot, query, details=False):
             print(f"  {hive:<20} {count}")
         print()
 
+    if startup_matches:
+        print(bold("Startup Items"))
+        for name, count in startup_names.most_common():
+            print(f"  {name:<50} {count}")
+        print()
+
+        print(bold("Startup Item Scopes"))
+        for scope, count in startup_scopes.most_common():
+            print(f"  {scope:<20} {count}")
+        print()
+
     if not details:
-        print(bold("Use --details to view full process, service, scheduled task, and registry autorun entries."))
+        print(bold("Use --details to view full process, service, scheduled task, registry autorun, and startup folder entries."))
         print()
         return
 
@@ -248,4 +286,13 @@ def print_process_inspection(snapshot, query, details=False):
             print(info(rule(INSPECT_WIDTH, "─")))
             print()
             print_registry_autorun(autorun)
+            print()
+
+    if startup_matches:
+        print(bold("Startup Folder Entries"))
+        print()
+        for item in startup_matches:
+            print(info(rule(INSPECT_WIDTH, "─")))
+            print()
+            print_startup_item(item)
             print()
