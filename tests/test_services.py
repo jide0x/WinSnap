@@ -1,7 +1,8 @@
 import unittest
 
+from winsnap.artifacts import ARTIFACTS_BY_KEY
 from winsnap.commands.diff import compatibility_report, diff_if_compatible
-from winsnap.differ import diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
+from winsnap.differ import diff_network_listeners, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
 
 
 class ServiceDiffTests(unittest.TestCase):
@@ -108,6 +109,32 @@ class StartupFolderDiffTests(unittest.TestCase):
         )
 
 
+class NetworkListenerDiffTests(unittest.TestCase):
+    def test_diff_network_listeners_added_removed_and_changed(self):
+        before = {
+            "network_listeners": [
+                network_listener("TCP", "0.0.0.0", 8080, 100),
+                network_listener("TCP", "127.0.0.1", 9000, 200, ProcessName="old.exe"),
+            ]
+        }
+        after = {
+            "network_listeners": [
+                network_listener("UDP", "0.0.0.0", 5353, 300),
+                network_listener("TCP", "127.0.0.1", 9000, 200, ProcessName="new.exe"),
+            ]
+        }
+
+        diff = diff_network_listeners(before, after)
+
+        self.assertEqual([listener["LocalPort"] for listener in diff["added"]], [5353])
+        self.assertEqual([listener["LocalPort"] for listener in diff["removed"]], [8080])
+        self.assertEqual(diff["changed"][0]["after"]["LocalPort"], 9000)
+        self.assertEqual(
+            diff["changed"][0]["changes"]["ProcessName"],
+            {"before": "old.exe", "after": "new.exe"},
+        )
+
+
 class CompatibilityTests(unittest.TestCase):
     def test_compatibility_report_marks_missing_before_collectors_as_skipped(self):
         before = {"processes": []}
@@ -117,6 +144,7 @@ class CompatibilityTests(unittest.TestCase):
             "scheduled_tasks": [],
             "registry_autoruns": [],
             "startup_folders": [],
+            "network_listeners": [],
         }
 
         report = compatibility_report(before, after)
@@ -138,14 +166,27 @@ class CompatibilityTests(unittest.TestCase):
             report[4],
             {"label": "Startup Folders", "status": "skipped", "reason": "not present in before snapshot"},
         )
+        self.assertEqual(
+            report[5],
+            {"label": "Network Listeners", "status": "skipped", "reason": "not present in before snapshot"},
+        )
 
     def test_diff_if_compatible_skips_missing_collector(self):
         before = {}
         after = {"services": [service("newsvc")]}
 
-        diff = diff_if_compatible(before, after, "services", diff_services)
+        diff = diff_if_compatible(before, after, ARTIFACTS_BY_KEY["services"])
 
         self.assertEqual(diff, {"added": [], "removed": [], "changed": []})
+
+    def test_diff_if_compatible_dispatches_registered_diff(self):
+        before = {"services": [service("oldsvc")]}
+        after = {"services": [service("newsvc")]}
+
+        diff = diff_if_compatible(before, after, ARTIFACTS_BY_KEY["services"])
+
+        self.assertEqual([svc["Name"] for svc in diff["added"]], ["newsvc"])
+        self.assertEqual([svc["Name"] for svc in diff["removed"]], ["oldsvc"])
 
 
 def service(name, **overrides):
@@ -200,6 +241,21 @@ def startup_item(name, **overrides):
         "TargetPath": "C:\\Program Files\\Example\\example.exe",
         "Arguments": "",
         "WorkingDirectory": "C:\\Program Files\\Example",
+    }
+    data.update(overrides)
+    return data
+
+
+def network_listener(protocol, address, port, pid, **overrides):
+    data = {
+        "Protocol": protocol,
+        "LocalAddress": address,
+        "LocalPort": port,
+        "State": "Listen" if protocol == "TCP" else None,
+        "OwningProcess": pid,
+        "ProcessName": "example.exe",
+        "ProcessPath": "C:\\Program Files\\Example\\example.exe",
+        "ServiceNames": ["ExampleService"],
     }
     data.update(overrides)
     return data

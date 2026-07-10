@@ -46,6 +46,7 @@ Collectors:
   scheduled tasks
   registry autoruns
   startup folders
+  network listeners
 """,
     )
     parser.add_argument(
@@ -57,7 +58,7 @@ Collectors:
 
     subparsers = parser.add_subparsers(dest="command", parser_class=WinSnapArgumentParser)
 
-    create_parser = subparsers.add_parser("create", help="Create a process/service/scheduled task/registry autorun/startup folder snapshot")
+    create_parser = subparsers.add_parser("create", help="Create a process/service/scheduled task/registry autorun/startup folder/network listener snapshot")
     create_parser.add_argument("name")
     create_parser.add_argument("--note", default="", help="Add a note to the snapshot")
 
@@ -66,12 +67,12 @@ Collectors:
     diff_parser.add_argument("after")
     diff_parser.add_argument("--details", action="store_true", help="Show detailed process changes")
 
-    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services/scheduled tasks/registry autoruns/startup items in one snapshot")
+    inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services/scheduled tasks/registry autoruns/startup items/network listeners in one snapshot")
     inspect_parser.add_argument("snapshot")
     inspect_parser.add_argument("query")
     inspect_parser.add_argument("--details", action="store_true", help="Show detailed matching entries")
 
-    search_parser = subparsers.add_parser("search", help="Search all snapshots for processes/services/scheduled tasks/registry autoruns/startup items")
+    search_parser = subparsers.add_parser("search", help="Search all snapshots for processes/services/scheduled tasks/registry autoruns/startup items/network listeners")
     search_parser.add_argument("query")
     search_parser.add_argument("--details", action="store_true", help="Show detailed matches across snapshots")
 

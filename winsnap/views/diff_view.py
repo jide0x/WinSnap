@@ -45,6 +45,7 @@ def print_diff_summary(before, after, diff):
     task_diff = diff["scheduled_tasks"]
     autorun_diff = diff["registry_autoruns"]
     startup_diff = diff["startup_folders"]
+    listener_diff = diff["network_listeners"]
     added = process_diff["added"]
     removed = process_diff["removed"]
     added_counts = Counter(process_name(process) for process in added)
@@ -84,6 +85,9 @@ def print_diff_summary(before, after, diff):
     print(f"  {'Added startup items':<27} {len(startup_diff['added'])}")
     print(f"  {'Removed startup items':<27} {len(startup_diff['removed'])}")
     print(f"  {'Changed startup items':<27} {len(startup_diff['changed'])}")
+    print(f"  {'Added listeners':<27} {len(listener_diff['added'])}")
+    print(f"  {'Removed listeners':<27} {len(listener_diff['removed'])}")
+    print(f"  {'Changed listeners':<27} {len(listener_diff['changed'])}")
     print()
 
     print(bold("Top Changed Apps"))
@@ -161,7 +165,29 @@ def print_diff_summary(before, after, diff):
     else:
         print("  None")
     print()
-    print(bold("Use --details to view full process, service, scheduled task, registry autorun, and startup folder entries."))
+
+    print(bold("Network Listener Changes"))
+    if listener_diff["added"] or listener_diff["removed"] or listener_diff["changed"]:
+        for listener in listener_diff["added"][:10]:
+            print(f"  + {network_listener_name(listener)}")
+        for listener in listener_diff["removed"][:10]:
+            print(f"  - {network_listener_name(listener)}")
+        for item in listener_diff["changed"][:10]:
+            fields = ", ".join(item["changes"].keys())
+            print(f"  ~ {network_listener_name(item['after'])} ({fields})")
+    else:
+        print("  None")
+    print()
+
+    print(bold("New Services With New Listeners"))
+    correlations = new_services_with_new_listeners(service_diff, listener_diff)
+    if correlations:
+        for service, listener in correlations[:10]:
+            print(f"  + {service_name(service)} -> {network_listener_name(listener)}")
+    else:
+        print("  None")
+    print()
+    print(bold("Use --details to view full process, service, scheduled task, registry autorun, startup folder, and network listener entries."))
     print()
 
 # Prints detailed diff report (full process entries)
@@ -174,6 +200,7 @@ def print_detailed_diff(before, after, diff):
     task_diff = diff["scheduled_tasks"]
     autorun_diff = diff["registry_autoruns"]
     startup_diff = diff["startup_folders"]
+    listener_diff = diff["network_listeners"]
 
     print(success(f"Added Processes ({len(process_diff['added'])})"))
     print()
@@ -324,6 +351,39 @@ def print_detailed_diff(before, after, diff):
             print(f"    After : {values['after']}")
         print()
 
+    print()
+    print(success(f"Added Network Listeners ({len(listener_diff['added'])})"))
+    print()
+    for listener in listener_diff["added"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_network_listener(listener)
+        print()
+
+    print()
+    print(error(f"Removed Network Listeners ({len(listener_diff['removed'])})"))
+    print()
+    for listener in listener_diff["removed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_network_listener(listener)
+        print()
+
+    print()
+    print(bold(f"Changed Network Listeners ({len(listener_diff['changed'])})"))
+    print()
+    for item in listener_diff["changed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_network_listener(item["after"])
+        print()
+        print(bold(" Changes"))
+        for field, values in item["changes"].items():
+            print(f"  {field}")
+            print(f"    Before: {format_listener_value(values['before'])}")
+            print(f"    After : {format_listener_value(values['after'])}")
+        print()
+
 
 def print_compatibility(diff):
     print(bold("Compatibility"))
@@ -410,6 +470,45 @@ def print_startup_item(item):
     print(f" Arguments   {item.get('Arguments') or 'None'}")
     print(f" Working Dir {item.get('WorkingDirectory') or 'Unknown'}")
 
+
+def network_listener_name(listener):
+    protocol = listener.get("Protocol") or "Unknown"
+    address = listener.get("LocalAddress") or "Unknown"
+    port = listener.get("LocalPort") if listener.get("LocalPort") is not None else "Unknown"
+    return f"{protocol} {address}:{port}"
+
+
+def print_network_listener(listener):
+    print(bold(network_listener_name(listener)))
+    print()
+    print(f" Protocol    {listener.get('Protocol') or 'Unknown'}")
+    print(f" Address     {listener.get('LocalAddress') or 'Unknown'}")
+    print(f" Port        {listener.get('LocalPort') if listener.get('LocalPort') is not None else 'Unknown'}")
+    print(f" State       {listener.get('State') or 'Unknown'}")
+    print(f" PID         {listener.get('OwningProcess') if listener.get('OwningProcess') is not None else 'Unknown'}")
+    print(f" Process     {listener.get('ProcessName') or 'Unknown'}")
+    print(f" Path        {listener.get('ProcessPath') or 'Unknown'}")
+    print(f" Services    {format_listener_value(listener.get('ServiceNames'))}")
+
+
+def new_services_with_new_listeners(service_diff, listener_diff):
+    correlations = []
+    added_services = service_diff.get("added", [])
+    added_listeners = listener_diff.get("added", [])
+
+    for service in added_services:
+        service_name_value = service.get("Name")
+        service_pid = service.get("ProcessId")
+        for listener in added_listeners:
+            service_names = listener_values(listener.get("ServiceNames"))
+            listener_pid = listener.get("OwningProcess")
+            name_matches = service_name_value and service_name_value in service_names
+            pid_matches = service_pid and service_pid != 0 and service_pid == listener_pid
+            if name_matches or pid_matches:
+                correlations.append((service, listener))
+
+    return correlations
+
 def task_values(value):
     if value is None or value == "":
         return ["None"]
@@ -420,3 +519,18 @@ def task_values(value):
 
 def format_task_value(value):
     return "; ".join(task_values(value))
+
+
+def listener_values(value):
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return [str(value)]
+
+
+def format_listener_value(value):
+    values = listener_values(value)
+    if not values:
+        return "None"
+    return ", ".join(values)

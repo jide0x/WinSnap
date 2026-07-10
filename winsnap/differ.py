@@ -21,6 +21,10 @@ def startup_folder_key(item):
     return f"{item.get('Scope') or ''}|{item.get('FullName') or ''}".lower()
 
 
+def network_listener_key(listener):
+    return f"{listener.get('Protocol') or ''}|{listener.get('LocalAddress') or ''}|{listener.get('LocalPort') or ''}|{listener.get('OwningProcess') or ''}".lower()
+
+
 def group_processes(processes):
     grouped = defaultdict(list)
     for process in processes:
@@ -245,6 +249,57 @@ def startup_folder_changes(before_item, after_item):
     for field in fields:
         before_value = before_item.get(field)
         after_value = after_item.get(field)
+        if before_value != after_value:
+            changes[field] = {
+                "before": before_value,
+                "after": after_value,
+            }
+
+    return changes
+
+
+def diff_network_listeners(before, after):
+    before_listeners = {
+        network_listener_key(listener): listener
+        for listener in before.get("network_listeners", [])
+        if network_listener_key(listener)
+    }
+    after_listeners = {
+        network_listener_key(listener): listener
+        for listener in after.get("network_listeners", [])
+        if network_listener_key(listener)
+    }
+
+    added_keys = after_listeners.keys() - before_listeners.keys()
+    removed_keys = before_listeners.keys() - after_listeners.keys()
+    common_keys = before_listeners.keys() & after_listeners.keys()
+
+    changed = []
+    for key in sorted(common_keys):
+        before_listener = before_listeners[key]
+        after_listener = after_listeners[key]
+        changes = network_listener_changes(before_listener, after_listener)
+        if changes:
+            changed.append({
+                "before": before_listener,
+                "after": after_listener,
+                "changes": changes,
+            })
+
+    return {
+        "added": [after_listeners[key] for key in sorted(added_keys)],
+        "removed": [before_listeners[key] for key in sorted(removed_keys)],
+        "changed": changed,
+    }
+
+
+def network_listener_changes(before_listener, after_listener):
+    fields = ["Protocol", "LocalAddress", "LocalPort", "State", "OwningProcess", "ProcessName", "ProcessPath", "ServiceNames"]
+    changes = {}
+
+    for field in fields:
+        before_value = before_listener.get(field)
+        after_value = after_listener.get(field)
         if before_value != after_value:
             changes[field] = {
                 "before": before_value,

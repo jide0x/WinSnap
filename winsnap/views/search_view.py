@@ -1,13 +1,11 @@
 from collections import Counter
 
-from winsnap.views.diff_view import autorun_name, print_registry_autorun, print_scheduled_task, print_service, print_startup_item, service_name, startup_item_name, task_name
-from winsnap.views.inspect_view import matching_processes, matching_registry_autoruns, matching_scheduled_tasks, matching_services, matching_startup_folders, process_name
-from winsnap.views.process_view import print_process
+from winsnap.artifacts import ARTIFACTS, matching_items
 from winsnap.views.snapshot_view import format_list_datetime
 from winsnap.views.ui import error, info, bold, rule
 
 
-SEARCH_WIDTH = 88
+SEARCH_WIDTH = 96
 
 
 def print_search_header(query):
@@ -24,17 +22,16 @@ def print_search_header(query):
 def snapshot_matches(snapshots, query):
     results = []
     for snapshot in snapshots:
-        process_matches = matching_processes(snapshot, query)
-        service_matches = matching_services(snapshot, query)
-        task_matches = matching_scheduled_tasks(snapshot, query)
-        autorun_matches = matching_registry_autoruns(snapshot, query)
-        startup_matches = matching_startup_folders(snapshot, query)
-        if process_matches or service_matches or task_matches or autorun_matches or startup_matches:
-            results.append((snapshot, process_matches, service_matches, task_matches, autorun_matches, startup_matches))
+        matches = {
+            artifact.key: matching_items(snapshot, artifact, query)
+            for artifact in ARTIFACTS
+        }
+        if any(matches.values()):
+            results.append({"snapshot": snapshot, "matches": matches})
     return results
 
 
-def print_process_search(snapshots, query, details=False):
+def print_snapshot_search(snapshots, query, details=False):
     results = snapshot_matches(snapshots, query)
 
     print_search_header(query)
@@ -44,174 +41,101 @@ def print_process_search(snapshots, query, details=False):
         print()
         return
 
-    total_process_matches = sum(len(processes) for _, processes, _, _, _, _ in results)
-    total_service_matches = sum(len(services) for _, _, services, _, _, _ in results)
-    total_task_matches = sum(len(tasks) for _, _, _, tasks, _, _ in results)
-    total_autorun_matches = sum(len(autoruns) for _, _, _, _, autoruns, _ in results)
-    total_startup_matches = sum(len(startup) for _, _, _, _, _, startup in results)
-    names = Counter(
-        process_name(process)
-        for _, processes, _, _, _, _ in results
-        for process in processes
-    )
-    services = Counter(
-        service_name(service)
-        for _, _, service_matches, _, _, _ in results
-        for service in service_matches
-    )
-    tasks = Counter(
-        task_name(task)
-        for _, _, _, task_matches, _, _ in results
-        for task in task_matches
-    )
-    autoruns = Counter(
-        autorun_name(autorun)
-        for _, _, _, _, autorun_matches, _ in results
-        for autorun in autorun_matches
-    )
-    startup_items = Counter(
-        startup_item_name(item)
-        for _, _, _, _, _, startup_matches in results
-        for item in startup_matches
-    )
-
     print(bold("Summary"))
     print(f"  {'Snapshots searched':<24} {len(snapshots)}")
     print(f"  {'Snapshots containing':<24} {len(results)}")
-    print(f"  {'Matching processes':<24} {total_process_matches}")
-    print(f"  {'Matching services':<24} {total_service_matches}")
-    print(f"  {'Matching tasks':<24} {total_task_matches}")
-    print(f"  {'Matching autoruns':<24} {total_autorun_matches}")
-    print(f"  {'Matching startup':<24} {total_startup_matches}")
-    print(f"  {'Unique process names':<24} {len(names)}")
-    print(f"  {'Unique services':<24} {len(services)}")
-    print(f"  {'Unique tasks':<24} {len(tasks)}")
-    print(f"  {'Unique autoruns':<24} {len(autoruns)}")
-    print(f"  {'Unique startup items':<24} {len(startup_items)}")
+    for artifact in ARTIFACTS:
+        print(f"  {artifact.matching_label:<24} {total_matches(results, artifact)}")
+    for artifact in ARTIFACTS:
+        print(f"  {'Unique ' + artifact.label.lower():<24} {len(name_counts(results, artifact))}")
     print()
 
+    print_matching_snapshots(results)
+
+    for artifact in ARTIFACTS:
+        print_match_counts(artifact.label, name_counts(results, artifact), 50)
+
+    if not details:
+        labels = ", ".join(artifact.label.lower() for artifact in ARTIFACTS)
+        print(bold(f"Use --details to view matching entries for {labels}."))
+        print()
+        return
+
+    print_details(results)
+
+
+def print_matching_snapshots(results):
     print(bold("Matching Snapshots"))
-    print(f"  {'Name':<20} {'Created':<20} {'Proc':>5} {'Svc':>5} {'Task':>5} {'Run':>5} {'Start':>5}  Top Matches")
+    columns = " ".join(f"{artifact.short_label:>5}" for artifact in ARTIFACTS)
+    print(f"  {'Name':<20} {'Created':<20} {columns}  Top Matches")
     print("  " + "-" * (SEARCH_WIDTH - 2))
-    for snapshot, process_matches, service_matches, task_matches, autorun_matches, startup_matches in results:
-        snapshot_process_names = Counter(process_name(process) for process in process_matches)
-        snapshot_service_names = Counter(service_name(service) for service in service_matches)
-        snapshot_task_names = Counter(task_name(task) for task in task_matches)
-        snapshot_autorun_names = Counter(autorun_name(autorun) for autorun in autorun_matches)
-        snapshot_startup_names = Counter(startup_item_name(item) for item in startup_matches)
-        top_process_names = [
-            f"{name} ({count})"
-            for name, count in snapshot_process_names.most_common(2)
-        ]
-        top_service_names = [
-            f"{name} ({count})"
-            for name, count in snapshot_service_names.most_common(2)
-        ]
-        top_task_names = [
-            f"{name} ({count})"
-            for name, count in snapshot_task_names.most_common(2)
-        ]
-        top_autorun_names = [
-            f"{name} ({count})"
-            for name, count in snapshot_autorun_names.most_common(2)
-        ]
-        top_startup_names = [
-            f"{name} ({count})"
-            for name, count in snapshot_startup_names.most_common(2)
-        ]
-        top_names = ", ".join(top_process_names + top_service_names + top_task_names + top_autorun_names + top_startup_names)
+    for result in results:
+        snapshot = result["snapshot"]
+        counts = " ".join(f"{len(result['matches'][artifact.key]):>5}" for artifact in ARTIFACTS)
+        top_names = ", ".join(top_match_names(result, limit=2))
         print(
             f"  {snapshot.get('name', 'Unknown'):<20} "
             f"{format_list_datetime(snapshot.get('created_at')):<20} "
-            f"{len(process_matches):>5} "
-            f"{len(service_matches):>5} "
-            f"{len(task_matches):>5} "
-            f"{len(autorun_matches):>5} "
-            f"{len(startup_matches):>5}  "
+            f"{counts}  "
             f"{top_names}"
         )
     print()
 
-    if names:
-        print(bold("Process Names"))
-        for name, count in names.most_common():
-            print(f"  {name:<30} {count}")
-        print()
 
-    if services:
-        print(bold("Services"))
-        for name, count in services.most_common():
-            print(f"  {name:<50} {count}")
-        print()
-
-    if tasks:
-        print(bold("Scheduled Tasks"))
-        for name, count in tasks.most_common():
-            print(f"  {name:<50} {count}")
-        print()
-
-    if autoruns:
-        print(bold("Registry Autoruns"))
-        for name, count in autoruns.most_common():
-            print(f"  {name:<50} {count}")
-        print()
-
-    if startup_items:
-        print(bold("Startup Items"))
-        for name, count in startup_items.most_common():
-            print(f"  {name:<50} {count}")
-        print()
-
-    if not details:
-        print(bold("Use --details to view matching process, service, scheduled task, registry autorun, and startup folder entries."))
-        print()
-        return
-
+def print_details(results):
     print(bold("Details"))
     print()
-    for snapshot, process_matches, service_matches, task_matches, autorun_matches, startup_matches in results:
+    for result in results:
+        snapshot = result["snapshot"]
         print(info(rule(SEARCH_WIDTH, "─")))
         print()
         print(bold(f"Snapshot: {snapshot.get('name', 'Unknown')}"))
         print(f"Created : {format_list_datetime(snapshot.get('created_at'))}")
-        print(f"Processes: {len(process_matches)}")
-        print(f"Services : {len(service_matches)}")
-        print(f"Tasks    : {len(task_matches)}")
-        print(f"Autoruns : {len(autorun_matches)}")
-        print(f"Startup  : {len(startup_matches)}")
+        for artifact in ARTIFACTS:
+            print(f"{artifact.label:<9}: {len(result['matches'][artifact.key])}")
         print()
 
-        if process_matches:
-            print(bold("Processes"))
+        for artifact in ARTIFACTS:
+            items = result["matches"][artifact.key]
+            if not items:
+                continue
+
+            print(bold(artifact.label))
             print()
-            for process in process_matches:
-                print_process(process)
+            for item in items:
+                artifact.print_item(item)
                 print()
 
-        if service_matches:
-            print(bold("Services"))
-            print()
-            for service in service_matches:
-                print_service(service)
-                print()
 
-        if task_matches:
-            print(bold("Scheduled Tasks"))
-            print()
-            for task in task_matches:
-                print_scheduled_task(task)
-                print()
+def total_matches(results, artifact):
+    return sum(len(result["matches"][artifact.key]) for result in results)
 
-        if autorun_matches:
-            print(bold("Registry Autoruns"))
-            print()
-            for autorun in autorun_matches:
-                print_registry_autorun(autorun)
-                print()
 
-        if startup_matches:
-            print(bold("Startup Items"))
-            print()
-            for item in startup_matches:
-                print_startup_item(item)
-                print()
+def name_counts(results, artifact):
+    return Counter(
+        artifact.name(item)
+        for result in results
+        for item in result["matches"][artifact.key]
+    )
+
+
+def top_match_names(result, limit):
+    names = []
+    for artifact in ARTIFACTS:
+        counts = Counter(artifact.name(item) for item in result["matches"][artifact.key])
+        names.extend(f"{name} ({count})" for name, count in counts.most_common(limit))
+    return names
+
+
+def print_match_counts(title, counter, width):
+    if not counter:
+        return
+
+    print(bold(title))
+    for name, count in counter.most_common():
+        print(f"  {name:<{width}} {count}")
+    print()
+
+
+def print_process_search(snapshots, query, details=False):
+    print_snapshot_search(snapshots, query, details=details)

@@ -1,39 +1,42 @@
 from datetime import datetime
 
+from winsnap.artifacts import ARTIFACTS, ARTIFACTS_BY_KEY
 from winsnap.views.ui import success, warning, info, bold, rule
 
 
 BOX_WIDTH = 38
-LIST_WIDTH = 104
+LIST_WIDTH = 112
 LIST_NAME_WIDTH = 20
 
 
 def process_count(snapshot):
-    return len(snapshot.get("processes", []))
+    return artifact_count(snapshot, "processes")
 
 
 def service_count(snapshot):
-    if "services" not in snapshot:
-        return None
-    return len(snapshot.get("services", []))
+    return artifact_count(snapshot, "services")
 
 
 def scheduled_task_count(snapshot):
-    if "scheduled_tasks" not in snapshot:
-        return None
-    return len(snapshot.get("scheduled_tasks", []))
+    return artifact_count(snapshot, "scheduled_tasks")
 
 
 def registry_autorun_count(snapshot):
-    if "registry_autoruns" not in snapshot:
-        return None
-    return len(snapshot.get("registry_autoruns", []))
+    return artifact_count(snapshot, "registry_autoruns")
 
 
 def startup_folder_count(snapshot):
-    if "startup_folders" not in snapshot:
+    return artifact_count(snapshot, "startup_folders")
+
+
+def network_listener_count(snapshot):
+    return artifact_count(snapshot, "network_listeners")
+
+
+def artifact_count(snapshot, key):
+    if key not in snapshot:
         return None
-    return len(snapshot.get("startup_folders", []))
+    return len(snapshot.get(key, []))
 
 
 def format_count(value):
@@ -57,6 +60,8 @@ def snapshot_note(snapshot):
 
 
 def collector_label(collector):
+    if collector in ARTIFACTS_BY_KEY:
+        return ARTIFACTS_BY_KEY[collector].label
     return str(collector).replace("_", " ").title()
 
 
@@ -96,15 +101,9 @@ def print_snapshot_summary(snapshot):
     print()
     print(f"Created       : {format_full_datetime(snapshot.get('created_at'))}")
     print()
-    print(f"Processes     : {format_count(process_count(snapshot))}")
-    print()
-    print(f"Services      : {format_count(service_count(snapshot))}")
-    print()
-    print(f"Tasks         : {format_count(scheduled_task_count(snapshot))}")
-    print()
-    print(f"Autoruns      : {format_count(registry_autorun_count(snapshot))}")
-    print()
-    print(f"Startup Items : {format_count(startup_folder_count(snapshot))}")
+    for artifact in ARTIFACTS:
+        print(f"{artifact.label:<14}: {format_count(artifact_count(snapshot, artifact.key))}")
+        print()
     if snapshot_note(snapshot):
         print()
         print(f"Note          : {snapshot_note(snapshot)}")
@@ -128,7 +127,7 @@ def print_snapshot_list(snapshots):
     print()
     print(bold("Snapshots"))
     print()
-    print(f"{'Name':<{LIST_NAME_WIDTH}} {'Created':<22} {'Proc':>5} {'Svc':>5} {'Task':>5} {'Run':>5} {'Start':>5}  Note")
+    print(f"{'Name':<{LIST_NAME_WIDTH}} {'Created':<22} {'Proc':>5} {'Svc':>5} {'Task':>5} {'Run':>5} {'Start':>5} {'Net':>5}  Note")
     print()
     print("-" * LIST_WIDTH)
     print()
@@ -141,6 +140,7 @@ def print_snapshot_list(snapshots):
             f"{format_list_count(scheduled_task_count(snap)):>5} "
             f"{format_list_count(registry_autorun_count(snap)):>5}  "
             f"{format_list_count(startup_folder_count(snap)):>5}  "
+            f"{format_list_count(network_listener_count(snap)):>5}  "
             f"{snapshot_note(snap)}"
         )
     print()

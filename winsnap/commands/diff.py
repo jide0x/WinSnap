@@ -1,31 +1,18 @@
-from winsnap.differ import diff_processes, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
+from winsnap.artifacts import ARTIFACTS
 from winsnap.snapshot_store import load_snapshot
 from winsnap.views.diff_view import print_detailed_diff, print_diff_summary
 
 
-COLLECTORS = {
-    "processes": "Processes",
-    "services": "Services",
-    "scheduled_tasks": "Scheduled Tasks",
-    "registry_autoruns": "Registry Autoruns",
-    "startup_folders": "Startup Folders",
-}
-
-EMPTY_DIFF = {"added": [], "removed": [], "changed": []}
+def empty_diff():
+    return {"added": [], "removed": [], "changed": []}
 
 
 def diff_snapshots(before_name, after_name, details=False):
     before = load_snapshot(before_name)
     after = load_snapshot(after_name)
 
-    diff = {
-        "processes": diff_if_compatible(before, after, "processes", diff_processes),
-        "services": diff_if_compatible(before, after, "services", diff_services),
-        "scheduled_tasks": diff_if_compatible(before, after, "scheduled_tasks", diff_scheduled_tasks),
-        "registry_autoruns": diff_if_compatible(before, after, "registry_autoruns", diff_registry_autoruns),
-        "startup_folders": diff_if_compatible(before, after, "startup_folders", diff_startup_folders),
-        "compatibility": compatibility_report(before, after),
-    }
+    diff = {artifact.key: diff_if_compatible(before, after, artifact) for artifact in ARTIFACTS}
+    diff["compatibility"] = compatibility_report(before, after)
 
     if details:
         print_detailed_diff(before, after, diff)
@@ -34,25 +21,25 @@ def diff_snapshots(before_name, after_name, details=False):
     print_diff_summary(before, after, diff)
 
 
-def diff_if_compatible(before, after, collector, diff_func):
-    if collector not in before or collector not in after:
-        return dict(EMPTY_DIFF)
-    return diff_func(before, after)
+def diff_if_compatible(before, after, artifact):
+    if artifact.key not in before or artifact.key not in after:
+        return empty_diff()
+    return artifact.diff(before, after)
 
 
 def compatibility_report(before, after):
     report = []
-    for collector, label in COLLECTORS.items():
-        before_has_collector = collector in before
-        after_has_collector = collector in after
+    for artifact in ARTIFACTS:
+        before_has_collector = artifact.key in before
+        after_has_collector = artifact.key in after
 
         if before_has_collector and after_has_collector:
-            report.append({"label": label, "status": "compared"})
+            report.append({"label": artifact.label, "status": "compared"})
         elif not before_has_collector and not after_has_collector:
-            report.append({"label": label, "status": "skipped", "reason": "not present in either snapshot"})
+            report.append({"label": artifact.label, "status": "skipped", "reason": "not present in either snapshot"})
         elif not before_has_collector:
-            report.append({"label": label, "status": "skipped", "reason": "not present in before snapshot"})
+            report.append({"label": artifact.label, "status": "skipped", "reason": "not present in before snapshot"})
         else:
-            report.append({"label": label, "status": "skipped", "reason": "not present in after snapshot"})
+            report.append({"label": artifact.label, "status": "skipped", "reason": "not present in after snapshot"})
 
     return report

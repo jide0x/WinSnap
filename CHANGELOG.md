@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.1
+
+- Refactor: introduce a central artifact registry that drives snapshot creation, diff dispatch, inspect, and search. Adding a new collector now requires a single registration instead of edits across commands and views.
+- UX: snapshot summary/list labels and counts are registry-driven for consistency.
+- Fix: detailed diff printing for changed Startup Items; cleaned up Network Listener detailed changes.
+- Compatibility: no snapshot JSON schema changes; older snapshots remain fully comparable and searchable.
+
+## 0.7
+
+- Added TCP listening port and UDP endpoint collection.
+- Added network listener counts to `show` and `list`.
+- Added network listener changes to `diff` summary and detailed output.
+- Added neutral correlation for new services with new listeners.
+- Expanded `inspect` and `search` to include network listeners.
+- Added network listener diff tests and compatibility reporting.
+
 ## 0.6
 
 - Added startup folder collection for user and machine-wide Startup folders.

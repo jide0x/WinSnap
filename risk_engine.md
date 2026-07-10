@@ -21,6 +21,7 @@ Current collectors:
 * Scheduled tasks
 * Registry autoruns
 * Startup folders
+* Network listeners
 
 Risk hints are currently archived pending filtering/noise-reduction work. The previous lightweight hint prototype is preserved in `archive/risk_hints.py` for future reuse.
 
@@ -177,7 +178,7 @@ Future collector.
 
 ## Network Risk Indicators
 
-Future collector.
+Network listener collection is implemented. Risk indicators remain archived until filtering/noise reduction is added.
 
 | Indicator                         | Suggested Weight | Why It Matters                                         |
 | --------------------------------- | ---------------: | ------------------------------------------------------ |

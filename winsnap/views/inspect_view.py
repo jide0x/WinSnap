@@ -1,79 +1,10 @@
 from collections import Counter
 
-from winsnap.views.diff_view import autorun_name, print_registry_autorun, print_scheduled_task, print_service, print_startup_item, service_name, startup_item_name, task_name
-from winsnap.views.process_view import print_process
+from winsnap.artifacts import ARTIFACTS, matching_items
 from winsnap.views.ui import error, info, bold, rule
 
 
 INSPECT_WIDTH = 60
-
-
-def process_matches(process, query):
-    query = query.lower()
-    fields = [
-        process.get("Name"),
-        process.get("ExecutablePath"),
-        process.get("CommandLine"),
-    ]
-    return any(query in str(field).lower() for field in fields if field)
-
-
-def service_matches(service, query):
-    query = query.lower()
-    fields = [
-        service.get("Name"),
-        service.get("DisplayName"),
-        service.get("State"),
-        service.get("Status"),
-        service.get("StartMode"),
-        service.get("StartName"),
-        service.get("PathName"),
-    ]
-    return any(query in str(field).lower() for field in fields if field)
-
-
-def scheduled_task_matches(task, query):
-    query = query.lower()
-    fields = [
-        task.get("TaskName"),
-        task.get("TaskPath"),
-        task.get("State"),
-        task.get("Author"),
-        task.get("RunAsUser"),
-        task.get("Triggers"),
-        task.get("Actions"),
-    ]
-    return any(query in str(field).lower() for field in fields if field)
-
-
-def registry_autorun_matches(autorun, query):
-    query = query.lower()
-    fields = [
-        autorun.get("Hive"),
-        autorun.get("KeyPath"),
-        autorun.get("ValueName"),
-        autorun.get("Value"),
-    ]
-    return any(query in str(field).lower() for field in fields if field)
-
-
-def startup_folder_matches(item, query):
-    query = query.lower()
-    fields = [
-        item.get("Scope"),
-        item.get("FolderPath"),
-        item.get("Name"),
-        item.get("FullName"),
-        item.get("Extension"),
-        item.get("TargetPath"),
-        item.get("Arguments"),
-        item.get("WorkingDirectory"),
-    ]
-    return any(query in str(field).lower() for field in fields if field)
-
-
-def process_name(process):
-    return process.get("Name") or "Unknown"
 
 
 def process_path(process):
@@ -84,44 +15,11 @@ def parent_pid(process):
     return process.get("ParentProcessId") or "Unknown"
 
 
-def matching_processes(snapshot, query):
-    return [
-        process
-        for process in snapshot.get("processes", [])
-        if process_matches(process, query)
-    ]
-
-
-def matching_services(snapshot, query):
-    return [
-        service
-        for service in snapshot.get("services", [])
-        if service_matches(service, query)
-    ]
-
-
-def matching_scheduled_tasks(snapshot, query):
-    return [
-        task
-        for task in snapshot.get("scheduled_tasks", [])
-        if scheduled_task_matches(task, query)
-    ]
-
-
-def matching_registry_autoruns(snapshot, query):
-    return [
-        autorun
-        for autorun in snapshot.get("registry_autoruns", [])
-        if registry_autorun_matches(autorun, query)
-    ]
-
-
-def matching_startup_folders(snapshot, query):
-    return [
-        item
-        for item in snapshot.get("startup_folders", [])
-        if startup_folder_matches(item, query)
-    ]
+def snapshot_matches(snapshot, query):
+    return {
+        artifact.key: matching_items(snapshot, artifact, query)
+        for artifact in ARTIFACTS
+    }
 
 
 def print_inspect_header(snapshot, query):
@@ -137,162 +35,97 @@ def print_inspect_header(snapshot, query):
     print()
 
 
-def print_process_inspection(snapshot, query, details=False):
-    process_matches = matching_processes(snapshot, query)
-    service_matches = matching_services(snapshot, query)
-    task_matches = matching_scheduled_tasks(snapshot, query)
-    autorun_matches = matching_registry_autoruns(snapshot, query)
-    startup_matches = matching_startup_folders(snapshot, query)
+def print_snapshot_inspection(snapshot, query, details=False):
+    matches = snapshot_matches(snapshot, query)
 
     print_inspect_header(snapshot, query)
 
-    if not process_matches and not service_matches and not task_matches and not autorun_matches and not startup_matches:
-        print(error("No matching processes, services, scheduled tasks, registry autoruns, or startup items found."))
+    if not any(matches.values()):
+        labels = ", ".join(artifact.label.lower() for artifact in ARTIFACTS)
+        print(error(f"No matching {labels} found."))
         print()
         return
 
-    names = Counter(process_name(process) for process in process_matches)
-    paths = Counter(process_path(process) for process in process_matches)
+    process_artifact = ARTIFACTS[0]
+    process_matches = matches[process_artifact.key]
+    process_paths = Counter(process_path(process) for process in process_matches)
     parent_pids = Counter(parent_pid(process) for process in process_matches)
     pids = sorted(
         process.get("ProcessId")
         for process in process_matches
         if process.get("ProcessId") is not None
     )
-    service_names = Counter(service_name(service) for service in service_matches)
-    service_states = Counter(service.get("State") or "Unknown" for service in service_matches)
-    service_start_modes = Counter(service.get("StartMode") or "Unknown" for service in service_matches)
-    task_names = Counter(task_name(task) for task in task_matches)
-    task_states = Counter(task.get("State") or "Unknown" for task in task_matches)
-    autorun_names = Counter(autorun_name(autorun) for autorun in autorun_matches)
-    autorun_hives = Counter(autorun.get("Hive") or "Unknown" for autorun in autorun_matches)
-    startup_names = Counter(startup_item_name(item) for item in startup_matches)
-    startup_scopes = Counter(item.get("Scope") or "Unknown" for item in startup_matches)
 
     print(bold("Summary"))
-    print(f"  {'Matching processes':<22} {len(process_matches)}")
-    print(f"  {'Matching services':<22} {len(service_matches)}")
-    print(f"  {'Matching tasks':<22} {len(task_matches)}")
-    print(f"  {'Matching autoruns':<22} {len(autorun_matches)}")
-    print(f"  {'Matching startup':<22} {len(startup_matches)}")
-    print(f"  {'Unique names':<22} {len(names)}")
-    print(f"  {'Unique paths':<22} {len(paths)}")
+    for artifact in ARTIFACTS:
+        print(f"  {artifact.matching_label:<22} {len(matches[artifact.key])}")
+    print(f"  {'Unique names':<22} {len(Counter(process_artifact.name(process) for process in process_matches))}")
+    print(f"  {'Unique paths':<22} {len(process_paths)}")
     print(f"  {'Parent PIDs':<22} {len(parent_pids)}")
     if pids:
         print(f"  {'PID range':<22} {pids[0]} - {pids[-1]}")
     print()
 
-    if process_matches:
-        print(bold("Process Names"))
-        for name, count in names.most_common():
-            print(f"  {name:<30} {count}")
-        print()
-
-        print(bold("Executable Paths"))
-        for path, count in paths.most_common():
-            print(f"  {count}x {path}")
-        print()
-
-        print(bold("Parent Processes"))
-        for pid, count in parent_pids.most_common():
-            print(f"  PID {pid:<10} {count} instance(s)")
-        print()
-
-    if service_matches:
-        print(bold("Services"))
-        for name, count in service_names.most_common():
-            print(f"  {name:<50} {count}")
-        print()
-
-        print(bold("Service States"))
-        for state, count in service_states.most_common():
-            print(f"  {state:<20} {count}")
-        print()
-
-        print(bold("Service Start Modes"))
-        for start_mode, count in service_start_modes.most_common():
-            print(f"  {start_mode:<20} {count}")
-        print()
-
-    if task_matches:
-        print(bold("Scheduled Tasks"))
-        for name, count in task_names.most_common():
-            print(f"  {name:<50} {count}")
-        print()
-
-        print(bold("Scheduled Task States"))
-        for state, count in task_states.most_common():
-            print(f"  {state:<20} {count}")
-        print()
-
-    if autorun_matches:
-        print(bold("Registry Autoruns"))
-        for name, count in autorun_names.most_common():
-            print(f"  {name:<50} {count}")
-        print()
-
-        print(bold("Registry Autorun Hives"))
-        for hive, count in autorun_hives.most_common():
-            print(f"  {hive:<20} {count}")
-        print()
-
-    if startup_matches:
-        print(bold("Startup Items"))
-        for name, count in startup_names.most_common():
-            print(f"  {name:<50} {count}")
-        print()
-
-        print(bold("Startup Item Scopes"))
-        for scope, count in startup_scopes.most_common():
-            print(f"  {scope:<20} {count}")
-        print()
+    print_artifact_summaries(matches)
 
     if not details:
-        print(bold("Use --details to view full process, service, scheduled task, registry autorun, and startup folder entries."))
+        labels = ", ".join(artifact.label.lower() for artifact in ARTIFACTS)
+        print(bold(f"Use --details to view full entries for {labels}."))
         print()
         return
 
-    if process_matches:
-        print(bold("Process Instances"))
+    print_artifact_details(matches)
+
+
+def print_artifact_summaries(matches):
+    for artifact in ARTIFACTS:
+        items = matches[artifact.key]
+        if not items:
+            continue
+
+        print(bold(artifact.inspect_section_label))
+        for name, count in Counter(artifact.name(item) for item in items).most_common():
+            print(f"  {name:<50} {count}")
         print()
-        for process in process_matches:
-            print(info(rule(INSPECT_WIDTH, "─")))
-            print()
-            print_process(process)
+
+        if artifact.key == "processes":
+            print(bold("Executable Paths"))
+            for path, count in Counter(process_path(process) for process in items).most_common():
+                print(f"  {count}x {path}")
             print()
 
-    if service_matches:
-        print(bold("Service Entries"))
-        print()
-        for service in service_matches:
-            print(info(rule(INSPECT_WIDTH, "─")))
-            print()
-            print_service(service)
+            print(bold("Parent Processes"))
+            for pid, count in Counter(parent_pid(process) for process in items).most_common():
+                print(f"  PID {pid:<10} {count} instance(s)")
             print()
 
-    if task_matches:
-        print(bold("Scheduled Task Entries"))
-        print()
-        for task in task_matches:
-            print(info(rule(INSPECT_WIDTH, "─")))
-            print()
-            print_scheduled_task(task)
+        for title, field_name in artifact.summary_fields:
+            print(bold(title))
+            for value, count in Counter(summary_value(item.get(field_name)) for item in items).most_common():
+                print(f"  {value:<20} {count}")
             print()
 
-    if autorun_matches:
-        print(bold("Registry Autorun Entries"))
+
+def print_artifact_details(matches):
+    for artifact in ARTIFACTS:
+        items = matches[artifact.key]
+        if not items:
+            continue
+
+        print(bold(artifact.detail_section_label))
         print()
-        for autorun in autorun_matches:
+        for item in items:
             print(info(rule(INSPECT_WIDTH, "─")))
             print()
-            print_registry_autorun(autorun)
+            artifact.print_item(item)
             print()
 
-    if startup_matches:
-        print(bold("Startup Folder Entries"))
-        print()
-        for item in startup_matches:
-            print(info(rule(INSPECT_WIDTH, "─")))
-            print()
-            print_startup_item(item)
-            print()
+
+def summary_value(value):
+    if value is None or value == "":
+        return "Unknown"
+    return str(value)
+
+
+def print_process_inspection(snapshot, query, details=False):
+    print_snapshot_inspection(snapshot, query, details=details)
