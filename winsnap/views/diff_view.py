@@ -1,6 +1,5 @@
 from collections import Counter
 
-from winsnap.risk_hints import registry_autorun_risk_hints, scheduled_task_risk_hints, service_risk_hints
 from winsnap.views.process_view import print_process
 from winsnap.views.ui import success, error, info, bold, rule
 
@@ -304,14 +303,6 @@ def print_service(service):
     print(f" Process ID   {service.get('ProcessId')}")
     print(f" Path         {service.get('PathName') or 'Unknown'}")
 
-    hints = service_risk_hints(service)
-    if hints:
-        print()
-        print(bold(" Risk Hints"))
-        for hint in hints:
-            print(f"  ! {hint}")
-
-
 def task_name(task):
     task_path = task.get("TaskPath") or ""
     task_name_value = task.get("TaskName") or "Unknown"
@@ -333,14 +324,6 @@ def print_scheduled_task(task):
     for action in task_values(task.get("Actions")):
         print(f"  - {action}")
 
-    hints = scheduled_task_risk_hints(task)
-    if hints:
-        print()
-        print(bold(" Risk Hints"))
-        for hint in hints:
-            print(f"  ! {hint}")
-
-
 def autorun_name(autorun):
     value_name = autorun.get("ValueName") or "Unknown"
     key_path = autorun.get("KeyPath") or "Unknown"
@@ -354,14 +337,6 @@ def print_registry_autorun(autorun):
     print(f" Key Path    {autorun.get('KeyPath') or 'Unknown'}")
     print(f" Value Name  {autorun.get('ValueName') or 'Unknown'}")
     print(f" Value       {autorun.get('Value') or 'Unknown'}")
-
-    hints = registry_autorun_risk_hints(autorun)
-    if hints:
-        print()
-        print(bold(" Risk Hints"))
-        for hint in hints:
-            print(f"  ! {hint}")
-
 
 def task_values(value):
     if value is None or value == "":

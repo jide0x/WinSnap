@@ -21,14 +21,16 @@ Current collectors:
 * Scheduled tasks
 * Registry autoruns
 
-Current service risk hints:
+Risk hints are currently archived pending filtering/noise-reduction work. The previous lightweight hint prototype is preserved in `archive/risk_hints.py` for future reuse.
+
+Archived service risk hints:
 
 * Auto-start service
 * Runs as LocalSystem
 * Path in user-writable location
 * Missing/unknown PathName
 
-Current scheduled task risk hints:
+Archived scheduled task risk hints:
 
 * Enabled scheduled task
 * Runs as SYSTEM
@@ -37,7 +39,7 @@ Current scheduled task risk hints:
 * Executes command or scripting host
 * Action path in user-writable location
 
-Current registry autorun risk hints:
+Archived registry autorun risk hints:
 
 * Run key persistence location
 * RunOnce persistence location
@@ -46,7 +48,7 @@ Current registry autorun risk hints:
 * Autorun path in user-writable location
 * Missing/empty autorun command
 
-These hints currently appear only in detailed diff output to avoid cluttering the default summary.
+These hints do not currently appear in active CLI output.
 
 ---
 
@@ -263,24 +265,28 @@ Do not implement the full risk engine yet.
 Recommended order:
 
 1. Continue collecting core Windows artifacts.
-2. Keep adding lightweight risk hints where they naturally fit.
-3. Document each hint in this file.
-4. After processes, services, scheduled tasks, registry autoruns, startup folders, and network collectors exist, build the scoring engine.
-5. Add AI summaries only after the deterministic risk engine is useful on its own.
+2. Add filtering to reduce noisy baseline entries.
+3. Reintroduce lightweight risk hints where filtering gives them enough signal.
+4. Document each reintroduced hint in this file.
+5. After processes, services, scheduled tasks, registry autoruns, startup folders, and network collectors exist, build the scoring engine.
+6. Add AI summaries only after the deterministic risk engine is useful on its own.
 
 ---
 
 ## Current Status
 
-Implemented hints:
+Archived hints:
 
 * Auto-start service
 * Runs as LocalSystem
 * Path in user-writable location
 * Missing/unknown PathName
+* Scheduled task hints
+* Registry autorun hints
 
 Not yet implemented:
 
+* Filtering/noise reduction
 * Numeric scoring
 * Global risk summary
 * Risk ranking

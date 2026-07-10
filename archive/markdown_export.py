@@ -2,7 +2,7 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from winsnap.risk_hints import service_risk_hints
+from archive.risk_hints import service_risk_hints
 from winsnap.views.diff_view import service_name
 from winsnap.version import VERSION
 

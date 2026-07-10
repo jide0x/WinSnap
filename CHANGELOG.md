@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+- Archived risk-hint output while filtering is developed to reduce noise.
+- Kept the previous risk-hint prototype under `archive/risk_hints.py` for later reuse.
+- Removed active risk-hint tests and documentation from the main CLI behavior.
+
 ## 0.5.1
 
 - Packaged WinSnap as an installable Python project with a `winsnap` console command.

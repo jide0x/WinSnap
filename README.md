@@ -5,7 +5,7 @@ WinSnap is a lightweight Windows snapshot and change-analysis CLI.
 
 It captures selected Windows system state, saves it as JSON, and helps you compare snapshots to understand what changed over time.
 
-Current version: `0.5.1`
+Current version: `0.5.2`
 
 Installation
 ------------
@@ -122,45 +122,12 @@ winsnap --help
 winsnap -h
 ```
 
-Service Risk Hints
-------------------
+Risk Hints
+----------
 
-Detailed service output can show risk hints such as:
+Risk hints are currently archived while filtering is developed to reduce noisy output.
 
-- Auto-start service
-- Runs as LocalSystem
-- Path in user-writable location
-- Missing/unknown PathName
-
-These are not detections by themselves. They are context clues that help you decide what deserves closer inspection.
-
-Registry Autorun Risk Hints
----------------------------
-
-Detailed registry autorun output can show risk hints such as:
-
-- Run key persistence location
-- RunOnce persistence location
-- Machine-wide autorun
-- Executes command or scripting host
-- Autorun path in user-writable location
-- Missing/empty autorun command
-
-These are not detections by themselves. They are context clues that help you decide what deserves closer inspection.
-
-Scheduled Task Risk Hints
--------------------------
-
-Detailed scheduled task output can show risk hints such as:
-
-- Enabled scheduled task
-- Runs as SYSTEM
-- Runs at logon
-- Runs at startup
-- Executes command or scripting host
-- Action path in user-writable location
-
-These are not detections by themselves. They are context clues that help you decide what deserves closer inspection.
+Snapshots still collect processes, services, scheduled tasks, and registry autoruns. Diff, inspect, and search output continues to show raw changes and matching entries without risk-hint labels.
 
 Scheduled Task Collection
 -------------------------

@@ -1,3 +1,10 @@
+"""Archived risk-hint prototype.
+
+This logic is parked until filtering/noise reduction is implemented and risk hints
+can be reintroduced across collectors with better signal quality.
+"""
+
+
 def service_risk_hints(service):
     hints = []
     start_mode = (service.get("StartMode") or "").lower()

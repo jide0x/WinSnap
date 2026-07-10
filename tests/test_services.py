@@ -2,7 +2,6 @@ import unittest
 
 from winsnap.commands.diff import compatibility_report, diff_if_compatible
 from winsnap.differ import diff_registry_autoruns, diff_scheduled_tasks, diff_services
-from winsnap.risk_hints import registry_autorun_risk_hints, scheduled_task_risk_hints, service_risk_hints
 
 
 class ServiceDiffTests(unittest.TestCase):
@@ -31,27 +30,6 @@ class ServiceDiffTests(unittest.TestCase):
         )
 
 
-class ServiceRiskHintTests(unittest.TestCase):
-    def test_service_risk_hints(self):
-        hints = service_risk_hints(
-            service(
-                "suspicioussvc",
-                StartMode="Auto",
-                StartName="LocalSystem",
-                PathName="C:\\Users\\Public\\svc.exe",
-            )
-        )
-
-        self.assertIn("Auto-start service", hints)
-        self.assertIn("Runs as LocalSystem", hints)
-        self.assertIn("Path in user-writable location", hints)
-
-    def test_missing_path_hint(self):
-        hints = service_risk_hints(service("missingpath", PathName=None))
-
-        self.assertIn("Missing/unknown PathName", hints)
-
-
 class ScheduledTaskDiffTests(unittest.TestCase):
     def test_diff_scheduled_tasks_added_removed_and_changed(self):
         before = {
@@ -78,30 +56,6 @@ class ScheduledTaskDiffTests(unittest.TestCase):
         )
 
 
-class ScheduledTaskRiskHintTests(unittest.TestCase):
-    def test_scheduled_task_risk_hints(self):
-        hints = scheduled_task_risk_hints(
-            scheduled_task(
-                "SuspiciousTask",
-                RunAsUser="SYSTEM",
-                Triggers=["At logon"],
-                Actions=["C:\\Users\\Public\\runner.exe"],
-            )
-        )
-
-        self.assertIn("Enabled scheduled task", hints)
-        self.assertIn("Runs as SYSTEM", hints)
-        self.assertIn("Runs at logon", hints)
-        self.assertIn("Action path in user-writable location", hints)
-
-    def test_scheduled_task_command_host_hint(self):
-        hints = scheduled_task_risk_hints(
-            scheduled_task("CommandTask", Actions=["powershell.exe -EncodedCommand abc"])
-        )
-
-        self.assertIn("Executes command or scripting host", hints)
-
-
 class RegistryAutorunDiffTests(unittest.TestCase):
     def test_diff_registry_autoruns_added_removed_and_changed(self):
         before = {
@@ -126,33 +80,6 @@ class RegistryAutorunDiffTests(unittest.TestCase):
             diff["changed"][0]["changes"]["Value"],
             {"before": "old.exe", "after": "new.exe"},
         )
-
-
-class RegistryAutorunRiskHintTests(unittest.TestCase):
-    def test_registry_autorun_risk_hints(self):
-        hints = registry_autorun_risk_hints(
-            registry_autorun(
-                "SuspiciousRun",
-                Hive="HKLM",
-                Value="C:\\Users\\Public\\runner.exe",
-            )
-        )
-
-        self.assertIn("Run key persistence location", hints)
-        self.assertIn("Machine-wide autorun", hints)
-        self.assertIn("Autorun path in user-writable location", hints)
-
-    def test_registry_autorun_runonce_and_command_host_hints(self):
-        hints = registry_autorun_risk_hints(
-            registry_autorun(
-                "OneShot",
-                KeyPath="HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
-                Value="powershell.exe -EncodedCommand abc",
-            )
-        )
-
-        self.assertIn("RunOnce persistence location", hints)
-        self.assertIn("Executes command or scripting host", hints)
 
 
 class CompatibilityTests(unittest.TestCase):
