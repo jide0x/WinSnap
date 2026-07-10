@@ -46,6 +46,7 @@ def print_diff_summary(before, after, diff):
     autorun_diff = diff["registry_autoruns"]
     startup_diff = diff["startup_folders"]
     listener_diff = diff["network_listeners"]
+    software_diff = diff.get("installed_software", {"added": [], "removed": [], "changed": []})
     added = process_diff["added"]
     removed = process_diff["removed"]
     added_counts = Counter(process_name(process) for process in added)
@@ -88,6 +89,9 @@ def print_diff_summary(before, after, diff):
     print(f"  {'Added listeners':<27} {len(listener_diff['added'])}")
     print(f"  {'Removed listeners':<27} {len(listener_diff['removed'])}")
     print(f"  {'Changed listeners':<27} {len(listener_diff['changed'])}")
+    print(f"  {'Added software':<27} {len(software_diff['added'])}")
+    print(f"  {'Removed software':<27} {len(software_diff['removed'])}")
+    print(f"  {'Changed software':<27} {len(software_diff['changed'])}")
     print()
 
     print(bold("Top Changed Apps"))
@@ -178,6 +182,18 @@ def print_diff_summary(before, after, diff):
     else:
         print("  None")
     print()
+    print(bold("Installed Software Changes"))
+    if software_diff["added"] or software_diff["removed"] or software_diff["changed"]:
+        for item in software_diff["added"][:10]:
+            print(f"  + {software_name(item)}")
+        for item in software_diff["removed"][:10]:
+            print(f"  - {software_name(item)}")
+        for item in software_diff["changed"][:10]:
+            fields = ", ".join(item["changes"].keys())
+            print(f"  ~ {software_name(item['after'])} ({fields})")
+    else:
+        print("  None")
+    print()
 
     print(bold("New Services With New Listeners"))
     correlations = new_services_with_new_listeners(service_diff, listener_diff)
@@ -201,6 +217,7 @@ def print_detailed_diff(before, after, diff):
     autorun_diff = diff["registry_autoruns"]
     startup_diff = diff["startup_folders"]
     listener_diff = diff["network_listeners"]
+    software_diff = diff.get("installed_software", {"added": [], "removed": [], "changed": []})
 
     print(success(f"Added Processes ({len(process_diff['added'])})"))
     print()
@@ -375,6 +392,39 @@ def print_detailed_diff(before, after, diff):
     for item in listener_diff["changed"]:
         print(info(rule(DIFF_WIDTH, "─")))
         print()
+
+    print()
+    print(success(f"Added Installed Software ({len(software_diff['added'])})"))
+    print()
+    for item in software_diff["added"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_installed_software(item)
+        print()
+
+    print()
+    print(error(f"Removed Installed Software ({len(software_diff['removed'])})"))
+    print()
+    for item in software_diff["removed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_installed_software(item)
+        print()
+
+    print()
+    print(bold(f"Changed Installed Software ({len(software_diff['changed'])})"))
+    print()
+    for item in software_diff["changed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_installed_software(item["after"])
+        print()
+        print(bold(" Changes"))
+        for field, values in item["changes"].items():
+            print(f"  {field}")
+            print(f"    Before: {values['before']}")
+            print(f"    After : {values['after']}")
+        print()
         print_network_listener(item["after"])
         print()
         print(bold(" Changes"))
@@ -489,6 +539,23 @@ def print_network_listener(listener):
     print(f" Process     {listener.get('ProcessName') or 'Unknown'}")
     print(f" Path        {listener.get('ProcessPath') or 'Unknown'}")
     print(f" Services    {format_listener_value(listener.get('ServiceNames'))}")
+
+
+def software_name(item):
+    name = item.get("DisplayName") or "Unknown"
+    version = item.get("DisplayVersion")
+    return f"{name} ({version})" if version else name
+
+
+def print_installed_software(item):
+    print(bold(software_name(item)))
+    print()
+    print(f" Name        {item.get('DisplayName') or 'Unknown'}")
+    print(f" Version     {item.get('DisplayVersion') or 'Unknown'}")
+    print(f" Publisher   {item.get('Publisher') or 'Unknown'}")
+    print(f" Install Date {item.get('InstallDate') or 'Unknown'}")
+    print(f" Location    {item.get('InstallLocation') or 'Unknown'}")
+    print(f" Uninstall   {item.get('UninstallString') or 'Unknown'}")
 
 
 def new_services_with_new_listeners(service_diff, listener_diff):

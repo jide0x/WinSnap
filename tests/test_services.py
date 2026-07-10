@@ -2,7 +2,7 @@ import unittest
 
 from winsnap.artifacts import ARTIFACTS_BY_KEY
 from winsnap.commands.diff import compatibility_report, diff_if_compatible
-from winsnap.differ import diff_network_listeners, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
+from winsnap.differ import diff_installed_software, diff_network_listeners, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
 
 
 class ServiceDiffTests(unittest.TestCase):
@@ -135,6 +135,29 @@ class NetworkListenerDiffTests(unittest.TestCase):
         )
 
 
+class InstalledSoftwareDiffTests(unittest.TestCase):
+    def test_diff_installed_software_added_removed_and_changed(self):
+        before = {
+            "installed_software": [
+                installed_software_win32("HKLM\\Software\\...\\AppA", "App A", "1.0", Publisher="Vendor"),
+                installed_software_uwp("Vendor.AppB_12345", "App B", "1.0.0.0"),
+            ]
+        }
+        after = {
+            "installed_software": [
+                installed_software_win32("HKLM\\Software\\...\\AppA", "App A", "2.0", Publisher="Vendor"),  # version changed
+                installed_software_uwp("Vendor.AppC_99999", "App C", "1.0.0.0"),  # new UWP
+            ]
+        }
+
+        diff = diff_installed_software(before, after)
+
+        self.assertEqual([item["DisplayName"] for item in diff["added"]], ["App C"])  # C added
+        self.assertEqual([item["DisplayName"] for item in diff["removed"]], ["App B"])  # B removed
+        self.assertEqual(diff["changed"][0]["after"]["DisplayVersion"], "2.0")
+        self.assertIn("DisplayVersion", diff["changed"][0]["changes"])  # A version changed
+
+
 class CompatibilityTests(unittest.TestCase):
     def test_compatibility_report_marks_missing_before_collectors_as_skipped(self):
         before = {"processes": []}
@@ -168,6 +191,10 @@ class CompatibilityTests(unittest.TestCase):
         )
         self.assertEqual(
             report[5],
+            {"label": "Installed Software", "status": "skipped", "reason": "not present in either snapshot"},
+        )
+        self.assertEqual(
+            report[6],
             {"label": "Network Listeners", "status": "skipped", "reason": "not present in before snapshot"},
         )
 
@@ -258,6 +285,34 @@ def network_listener(protocol, address, port, pid, **overrides):
         "ServiceNames": ["ExampleService"],
     }
     data.update(overrides)
+    return data
+
+
+def installed_software_win32(key_path, name, version, **overrides):
+    data = {
+        "Type": "Win32",
+        "KeyPath": key_path,
+        "DisplayName": name,
+        "DisplayVersion": version,
+        "Publisher": overrides.get("Publisher"),
+        "InstallDate": overrides.get("InstallDate"),
+        "InstallLocation": overrides.get("InstallLocation"),
+        "UninstallString": overrides.get("UninstallString"),
+    }
+    return data
+
+
+def installed_software_uwp(package_id, name, version, **overrides):
+    data = {
+        "Type": "UWP",
+        "PackageId": package_id,
+        "DisplayName": name,
+        "DisplayVersion": version,
+        "Publisher": overrides.get("Publisher"),
+        "InstallDate": None,
+        "InstallLocation": overrides.get("InstallLocation"),
+        "UninstallString": None,
+    }
     return data
 
 

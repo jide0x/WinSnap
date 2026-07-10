@@ -21,6 +21,7 @@ Current collectors:
 * Scheduled tasks
 * Registry autoruns
 * Startup folders
+* Installed software
 * Network listeners
 
 Risk hints are currently archived pending filtering/noise-reduction work. The previous lightweight hint prototype is preserved in `archive/risk_hints.py` for future reuse.

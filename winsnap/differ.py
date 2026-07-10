@@ -307,3 +307,71 @@ def network_listener_changes(before_listener, after_listener):
             }
 
     return changes
+
+
+# Installed software
+
+def installed_software_key(item):
+    type_val = (item.get("Type") or "").lower()
+    if type_val == "win32":
+        return (item.get("KeyPath") or "").lower()
+    if type_val == "uwp":
+        return (item.get("PackageId") or "").lower()
+    # Fallback if Type/identity missing
+    return (item.get("DisplayName") or "").lower()
+
+
+def diff_installed_software(before, after):
+    before_items = {
+        installed_software_key(item): item
+        for item in before.get("installed_software", [])
+        if installed_software_key(item)
+    }
+    after_items = {
+        installed_software_key(item): item
+        for item in after.get("installed_software", [])
+        if installed_software_key(item)
+    }
+
+    added_keys = after_items.keys() - before_items.keys()
+    removed_keys = before_items.keys() - after_items.keys()
+    common_keys = before_items.keys() & after_items.keys()
+
+    changed = []
+    for key in sorted(common_keys):
+        before_item = before_items[key]
+        after_item = after_items[key]
+        changes = installed_software_changes(before_item, after_item)
+        if changes:
+            changed.append({
+                "before": before_item,
+                "after": after_item,
+                "changes": changes,
+            })
+
+    return {
+        "added": [after_items[key] for key in sorted(added_keys)],
+        "removed": [before_items[key] for key in sorted(removed_keys)],
+        "changed": changed,
+    }
+
+
+def installed_software_changes(before_item, after_item):
+    fields = [
+        "DisplayVersion",
+        "Publisher",
+        "InstallLocation",
+        "UninstallString",
+    ]
+    changes = {}
+
+    for field in fields:
+        before_value = before_item.get(field)
+        after_value = after_item.get(field)
+        if before_value != after_value:
+            changes[field] = {
+                "before": before_value,
+                "after": after_value,
+            }
+
+    return changes

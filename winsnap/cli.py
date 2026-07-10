@@ -46,6 +46,7 @@ Collectors:
   scheduled tasks
   registry autoruns
   startup folders
+  installed software
   network listeners
 """,
     )
