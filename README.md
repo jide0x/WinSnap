@@ -10,22 +10,23 @@ Current version: `1.0.2`
 Installation
 ------------
 
+Using pip:
+```bash
+pip install WinSnap
+```
+
+
 From the project folder:
 
 ```bash
 python -m pip install .
 ```
 
-For development, install in editable mode:
-
-```bash
-python -m pip install -e .
-```
-
 After installation, run:
 
 ```bash
 winsnap --help
+winsnap --version
 ```
 
 Current collectors:
