@@ -42,3 +42,13 @@ jobs:
       - name: Build wheel
         run: |
           python -m build
+
+      - name: Wheel install smoke (venv)
+        shell: powershell
+        run: |
+          python -m venv .venv-ci
+          .\.venv-ci\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          pip install (Get-ChildItem dist\*.whl | Select-Object -First 1).FullName
+          winsnap --version
+          winsnap help

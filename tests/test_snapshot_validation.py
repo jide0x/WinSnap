@@ -16,6 +16,15 @@ class SnapshotValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_snapshot({"name": "x", "created_at": "now", "collectors": "bad"})
 
+    def test_unknown_collector_raises(self):
+        with self.assertRaises(ValueError):
+            validate_snapshot({"name": "x", "created_at": "now", "collectors": ["unknown_type"]})
+
+    def test_out_of_order_collectors_raise(self):
+        # Reverse two known collectors to violate ordering
+        with self.assertRaises(ValueError):
+            validate_snapshot({"name": "x", "created_at": "now", "collectors": ["services", "processes"]})
+
 
 if __name__ == "__main__":
     unittest.main()

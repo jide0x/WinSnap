@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
+from winsnap.artifacts import SUPPORTED_COLLECTORS
 
 
 SCHEMA_VERSION = 1
@@ -31,6 +32,18 @@ def validate_snapshot(snapshot: Dict[str, Any]) -> None:
         raise ValueError("Snapshot collectors must be a list")
     if "collector" in snapshot and not isinstance(snapshot.get("collector"), list):
         raise ValueError("Snapshot collectors must be a list")
+
+    # Enforce collectors subset and order (relative to supported list) when present
+    cols = snapshot_collectors(snapshot)
+    if cols:
+        # Subset
+        unknown = [c for c in cols if c not in SUPPORTED_COLLECTORS]
+        if unknown:
+            raise ValueError(f"Unknown collectors found: {unknown}")
+        # Stable relative ordering
+        indices = [SUPPORTED_COLLECTORS.index(c) for c in cols]
+        if indices != sorted(indices):
+            raise ValueError("Collectors are not in supported order")
 
     # Validate schema version when present
     schema_version = snapshot.get("schema_version")

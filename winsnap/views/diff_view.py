@@ -320,7 +320,18 @@ def print_detailed_diff(before, after, diff):
         print_service(item["after"])
         print()
         print(bold(" Changes"))
+        # Special rendering for Binary Content Changed
+        fh = item["changes"].get("FileHash") if item.get("changes") else None
+        if fh is not None:
+            path = (item["after"].get("file") or {}).get("path")
+            print(bold("  Binary Content Changed"))
+            if path:
+                print(f"   Path        {path}")
+            print(f"   Before SHA-256  {fh.get('before')}")
+            print(f"   After  SHA-256  {fh.get('after')}")
         for field, values in item["changes"].items():
+            if field == "FileHash":
+                continue
             print(f"  {field}")
             print(f"    Before: {values['before']}")
             print(f"    After : {values['after']}")
@@ -386,7 +397,17 @@ def print_detailed_diff(before, after, diff):
         print_registry_autorun(item["after"])
         print()
         print(bold(" Changes"))
+        fh = item["changes"].get("FileHash") if item.get("changes") else None
+        if fh is not None:
+            path = (item["after"].get("file") or {}).get("path")
+            print(bold("  Binary Content Changed"))
+            if path:
+                print(f"   Path        {path}")
+            print(f"   Before SHA-256  {fh.get('before')}")
+            print(f"   After  SHA-256  {fh.get('after')}")
         for field, values in item["changes"].items():
+            if field == "FileHash":
+                continue
             print(f"  {field}")
             print(f"    Before: {values['before']}")
             print(f"    After : {values['after']}")
@@ -419,7 +440,17 @@ def print_detailed_diff(before, after, diff):
         print_startup_item(item["after"])
         print()
         print(bold(" Changes"))
+        fh = item["changes"].get("FileHash") if item.get("changes") else None
+        if fh is not None:
+            path = (item["after"].get("file") or {}).get("path")
+            print(bold("  Binary Content Changed"))
+            if path:
+                print(f"   Path        {path}")
+            print(f"   Before SHA-256  {fh.get('before')}")
+            print(f"   After  SHA-256  {fh.get('after')}")
         for field, values in item["changes"].items():
+            if field == "FileHash":
+                continue
             print(f"  {field}")
             print(f"    Before: {values['before']}")
             print(f"    After : {values['after']}")
@@ -477,7 +508,17 @@ def print_detailed_diff(before, after, diff):
         print_installed_software(item["after"])
         print()
         print(bold(" Changes"))
+        fh = item["changes"].get("FileHash") if item.get("changes") else None
+        if fh is not None:
+            path = (item["after"].get("file") or {}).get("path")
+            print(bold("  Binary Content Changed"))
+            if path:
+                print(f"   Path        {path}")
+            print(f"   Before SHA-256  {fh.get('before')}")
+            print(f"   After  SHA-256  {fh.get('after')}")
         for field, values in item["changes"].items():
+            if field == "FileHash":
+                continue
             print(f"  {field}")
             print(f"    Before: {values['before']}")
             print(f"    After : {values['after']}")
