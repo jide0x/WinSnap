@@ -2,8 +2,9 @@ from dataclasses import dataclass, field
 
 from winsnap.collectors import collect_network_listeners, collect_processes, collect_registry_autoruns, collect_scheduled_tasks, collect_services, collect_startup_folders
 from winsnap.collectors.installed_software import collect_installed_software
-from winsnap.differ import diff_installed_software, diff_network_listeners, diff_processes, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
-from winsnap.views.diff_view import autorun_name, network_listener_name, print_installed_software, print_network_listener, print_registry_autorun, print_scheduled_task, print_service, print_startup_item, process_name, service_name, software_name, startup_item_name, task_name
+from winsnap.collectors.firewall_rules import collect_firewall_rules
+from winsnap.differ import diff_firewall_rules, diff_installed_software, diff_network_listeners, diff_processes, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
+from winsnap.views.diff_view import autorun_name, network_listener_name, print_firewall_rule, print_installed_software, print_network_listener, print_registry_autorun, print_scheduled_task, print_service, print_startup_item, process_name, service_name, software_name, startup_item_name, task_name, firewall_rule_name
 from winsnap.views.process_view import print_process
 
 
@@ -106,6 +107,20 @@ ARTIFACTS = [
         name=software_name,
         print_item=print_installed_software,
         summary_fields=(("Publishers", "Publisher"),),
+    ),
+    Artifact(
+        key="firewall_rules",
+        label="Firewall Rules",
+        short_label="FW",
+        matching_label="Matching firewall rules",
+        inspect_section_label="Firewall Rules",
+        detail_section_label="Firewall Rule Entries",
+        collect=collect_firewall_rules,
+        diff=diff_firewall_rules,
+        search_fields=("Name", "Direction", "Action", "Protocol", "LocalPort", "RemotePort", "Program", "Profiles"),
+        name=firewall_rule_name,
+        print_item=print_firewall_rule,
+        summary_fields=(("Directions", "Direction"), ("Actions", "Action")),
     ),
     Artifact(
         key="network_listeners",

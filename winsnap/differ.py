@@ -375,3 +375,70 @@ def installed_software_changes(before_item, after_item):
             }
 
     return changes
+
+
+# Firewall rules
+
+def firewall_rule_key(rule):
+    # Prefer internal RuleName if present; otherwise fall back to Name
+    return (rule.get("RuleName") or rule.get("Name") or "").lower()
+
+
+def diff_firewall_rules(before, after):
+    before_rules = {
+        firewall_rule_key(rule): rule
+        for rule in before.get("firewall_rules", [])
+        if firewall_rule_key(rule)
+    }
+    after_rules = {
+        firewall_rule_key(rule): rule
+        for rule in after.get("firewall_rules", [])
+        if firewall_rule_key(rule)
+    }
+
+    added_keys = after_rules.keys() - before_rules.keys()
+    removed_keys = before_rules.keys() - after_rules.keys()
+    common_keys = before_rules.keys() & after_rules.keys()
+
+    changed = []
+    for key in sorted(common_keys):
+        before_rule = before_rules[key]
+        after_rule = after_rules[key]
+        changes = firewall_rule_changes(before_rule, after_rule)
+        if changes:
+            changed.append({
+                "before": before_rule,
+                "after": after_rule,
+                "changes": changes,
+            })
+
+    return {
+        "added": [after_rules[key] for key in sorted(added_keys)],
+        "removed": [before_rules[key] for key in sorted(removed_keys)],
+        "changed": changed,
+    }
+
+
+def firewall_rule_changes(before_rule, after_rule):
+    fields = [
+        "Direction",
+        "Action",
+        "Enabled",
+        "Protocol",
+        "LocalPort",
+        "RemotePort",
+        "Program",
+        "Profiles",
+    ]
+    changes = {}
+
+    for field in fields:
+        before_value = before_rule.get(field)
+        after_value = after_rule.get(field)
+        if before_value != after_value:
+            changes[field] = {
+                "before": before_value,
+                "after": after_value,
+            }
+
+    return changes

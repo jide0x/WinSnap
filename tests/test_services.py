@@ -2,7 +2,7 @@ import unittest
 
 from winsnap.artifacts import ARTIFACTS_BY_KEY
 from winsnap.commands.diff import compatibility_report, diff_if_compatible
-from winsnap.differ import diff_installed_software, diff_network_listeners, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
+from winsnap.differ import diff_firewall_rules, diff_installed_software, diff_network_listeners, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
 
 
 class ServiceDiffTests(unittest.TestCase):
@@ -158,6 +158,29 @@ class InstalledSoftwareDiffTests(unittest.TestCase):
         self.assertIn("DisplayVersion", diff["changed"][0]["changes"])  # A version changed
 
 
+class FirewallRuleDiffTests(unittest.TestCase):
+    def test_diff_firewall_rules_added_removed_and_changed(self):
+        before = {
+            "firewall_rules": [
+                firewall_rule("RuleA", Direction="Inbound", Action="Allow", Protocol="TCP", LocalPort="80"),
+                firewall_rule("RuleB", Direction="Outbound", Action="Block", Protocol="UDP", LocalPort="Any"),
+            ]
+        }
+        after = {
+            "firewall_rules": [
+                firewall_rule("RuleC", Direction="Inbound", Action="Allow", Protocol="TCP", LocalPort="443"),
+                firewall_rule("RuleA", Direction="Inbound", Action="Block", Protocol="TCP", LocalPort="80"),
+            ]
+        }
+
+        diff = diff_firewall_rules(before, after)
+
+        self.assertEqual([r["Name"] for r in diff["added"]], ["RuleC"])  # C added
+        self.assertEqual([r["Name"] for r in diff["removed"]], ["RuleB"])  # B removed
+        self.assertEqual(diff["changed"][0]["after"]["Action"], "Block")
+        self.assertIn("Action", diff["changed"][0]["changes"])  # action changed
+
+
 class CompatibilityTests(unittest.TestCase):
     def test_compatibility_report_marks_missing_before_collectors_as_skipped(self):
         before = {"processes": []}
@@ -168,6 +191,7 @@ class CompatibilityTests(unittest.TestCase):
             "registry_autoruns": [],
             "startup_folders": [],
             "network_listeners": [],
+            "firewall_rules": [],
         }
 
         report = compatibility_report(before, after)
@@ -195,6 +219,10 @@ class CompatibilityTests(unittest.TestCase):
         )
         self.assertEqual(
             report[6],
+            {"label": "Firewall Rules", "status": "skipped", "reason": "not present in before snapshot"},
+        )
+        self.assertEqual(
+            report[7],
             {"label": "Network Listeners", "status": "skipped", "reason": "not present in before snapshot"},
         )
 
@@ -313,6 +341,23 @@ def installed_software_uwp(package_id, name, version, **overrides):
         "InstallLocation": overrides.get("InstallLocation"),
         "UninstallString": None,
     }
+    return data
+
+
+def firewall_rule(name, **overrides):
+    data = {
+        "Name": name,
+        "RuleName": name,
+        "Direction": "Inbound",
+        "Action": "Allow",
+        "Enabled": True,
+        "Protocol": "Any",
+        "LocalPort": "Any",
+        "RemotePort": "Any",
+        "Program": None,
+        "Profiles": "Any",
+    }
+    data.update(overrides)
     return data
 
 

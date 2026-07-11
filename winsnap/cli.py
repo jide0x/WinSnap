@@ -47,6 +47,7 @@ Collectors:
   registry autoruns
   startup folders
   installed software
+  firewall rules
   network listeners
 """,
     )

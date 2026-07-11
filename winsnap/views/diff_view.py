@@ -46,6 +46,7 @@ def print_diff_summary(before, after, diff):
     autorun_diff = diff["registry_autoruns"]
     startup_diff = diff["startup_folders"]
     listener_diff = diff["network_listeners"]
+    firewall_diff = diff.get("firewall_rules", {"added": [], "removed": [], "changed": []})
     software_diff = diff.get("installed_software", {"added": [], "removed": [], "changed": []})
     added = process_diff["added"]
     removed = process_diff["removed"]
@@ -90,8 +91,11 @@ def print_diff_summary(before, after, diff):
     print(f"  {'Removed listeners':<27} {len(listener_diff['removed'])}")
     print(f"  {'Changed listeners':<27} {len(listener_diff['changed'])}")
     print(f"  {'Added software':<27} {len(software_diff['added'])}")
+    print(f"  {'Added firewall rules':<27} {len(firewall_diff['added'])}")
     print(f"  {'Removed software':<27} {len(software_diff['removed'])}")
+    print(f"  {'Removed firewall rules':<27} {len(firewall_diff['removed'])}")
     print(f"  {'Changed software':<27} {len(software_diff['changed'])}")
+    print(f"  {'Changed firewall rules':<27} {len(firewall_diff['changed'])}")
     print()
 
     print(bold("Top Changed Apps"))
@@ -203,7 +207,15 @@ def print_diff_summary(before, after, diff):
     else:
         print("  None")
     print()
-    print(bold("Use --details to view full process, service, scheduled task, registry autorun, startup folder, and network listener entries."))
+    print(bold("New Allow Inbound Rules With New Listeners"))
+    fw_listener_corr = new_allow_inbound_rules_with_new_listeners(firewall_diff, listener_diff)
+    if fw_listener_corr:
+        for rule, listener in fw_listener_corr[:10]:
+            print(f"  + {firewall_rule_name(rule)} -> {network_listener_name(listener)}")
+    else:
+        print("  None")
+    print()
+    print(bold("Use --details to view full process, service, scheduled task, registry autorun, startup folder, installed software, firewall rule, and network listener entries."))
     print()
 
 # Prints detailed diff report (full process entries)
@@ -218,6 +230,7 @@ def print_detailed_diff(before, after, diff):
     startup_diff = diff["startup_folders"]
     listener_diff = diff["network_listeners"]
     software_diff = diff.get("installed_software", {"added": [], "removed": [], "changed": []})
+    firewall_diff = diff.get("firewall_rules", {"added": [], "removed": [], "changed": []})
 
     print(success(f"Added Processes ({len(process_diff['added'])})"))
     print()
@@ -425,13 +438,38 @@ def print_detailed_diff(before, after, diff):
             print(f"    Before: {values['before']}")
             print(f"    After : {values['after']}")
         print()
-        print_network_listener(item["after"])
+
+    print()
+    print(success(f"Added Firewall Rules ({len(firewall_diff['added'])})"))
+    print()
+    for rule_item in firewall_diff["added"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_firewall_rule(rule_item)
+        print()
+
+    print()
+    print(error(f"Removed Firewall Rules ({len(firewall_diff['removed'])})"))
+    print()
+    for rule_item in firewall_diff["removed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_firewall_rule(rule_item)
+        print()
+
+    print()
+    print(bold(f"Changed Firewall Rules ({len(firewall_diff['changed'])})"))
+    print()
+    for item in firewall_diff["changed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_firewall_rule(item["after"])
         print()
         print(bold(" Changes"))
         for field, values in item["changes"].items():
             print(f"  {field}")
-            print(f"    Before: {format_listener_value(values['before'])}")
-            print(f"    After : {format_listener_value(values['after'])}")
+            print(f"    Before: {values['before']}")
+            print(f"    After : {values['after']}")
         print()
 
 
@@ -541,6 +579,23 @@ def print_network_listener(listener):
     print(f" Services    {format_listener_value(listener.get('ServiceNames'))}")
 
 
+def firewall_rule_name(rule):
+    return rule.get("Name") or "Unknown"
+
+
+def print_firewall_rule(rule):
+    print(bold(firewall_rule_name(rule)))
+    print()
+    print(f" Direction   {rule.get('Direction') or 'Unknown'}")
+    print(f" Action      {rule.get('Action') or 'Unknown'}")
+    print(f" Enabled     {rule.get('Enabled')}")
+    print(f" Protocol    {rule.get('Protocol') or 'Unknown'}")
+    print(f" Local Port  {rule.get('LocalPort') or 'Unknown'}")
+    print(f" Remote Port {rule.get('RemotePort') or 'Unknown'}")
+    print(f" Program     {rule.get('Program') or 'Unknown'}")
+    print(f" Profiles    {rule.get('Profiles') or 'Unknown'}")
+
+
 def software_name(item):
     name = item.get("DisplayName") or "Unknown"
     version = item.get("DisplayVersion")
@@ -601,3 +656,54 @@ def format_listener_value(value):
     if not values:
         return "None"
     return ", ".join(values)
+
+
+def new_allow_inbound_rules_with_new_listeners(firewall_diff, listener_diff):
+    pairs = []
+    added_rules = firewall_diff.get("added", [])
+    added_listeners = listener_diff.get("added", [])
+
+    for rule_item in added_rules:
+        if (rule_item.get("Direction") or "").lower() != "inbound":
+            continue
+        if (rule_item.get("Action") or "").lower() != "allow":
+            continue
+        rule_proto = (rule_item.get("Protocol") or "Any").upper()
+        rule_port_spec = (rule_item.get("LocalPort") or "Any")
+        for listener in added_listeners:
+            if firewall_listener_matches(rule_proto, rule_port_spec, listener):
+                pairs.append((rule_item, listener))
+    return pairs
+
+
+def firewall_listener_matches(rule_proto, rule_port_spec, listener):
+    lst_proto = (listener.get("Protocol") or "").upper()
+    if rule_proto not in ("ANY", lst_proto):
+        return False
+    lst_port_val = listener.get("LocalPort")
+    try:
+        port = int(lst_port_val) if lst_port_val is not None else None
+    except Exception:
+        port = None
+    spec = str(rule_port_spec or "Any")
+    if spec.lower() == "any":
+        return True
+    for token in spec.split(','):
+        token = token.strip()
+        if not token:
+            continue
+        if '-' in token:
+            a, b = token.split('-', 1)
+            try:
+                start = int(a); end = int(b)
+            except Exception:
+                continue
+            if port is not None and start <= port <= end:
+                return True
+        else:
+            try:
+                if port is not None and int(token) == port:
+                    return True
+            except Exception:
+                continue
+    return False
