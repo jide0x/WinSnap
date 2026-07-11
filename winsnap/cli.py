@@ -70,6 +70,8 @@ Collectors:
     create_parser.add_argument("--no-signature", action="store_true", help="Disable Authenticode signature verification during snapshot creation")
     create_parser.add_argument("--workers", type=int, default=0, help="Override parallel collector workers (default: 4 or #artifacts)")
     create_parser.add_argument("--timings", action="store_true", help="Print per-collector durations and statuses after creation")
+    create_parser.add_argument("--retries", type=int, default=1, help="Retry failed collectors up to N times (default: 1)")
+    create_parser.add_argument("--timeout-factor", type=float, default=1.0, help="Multiply collector timeouts by this factor (default: 1.0)")
 
     diff_parser = subparsers.add_parser("diff", help="Compare two snapshots")
     diff_parser.add_argument("before")
@@ -137,6 +139,8 @@ def run_command(args, parser):
             no_signature=args.no_signature,
             workers=args.workers,
             timings=args.timings,
+            retries=args.retries,
+            timeout_factor=args.timeout_factor,
         )
         return
 

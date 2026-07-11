@@ -38,7 +38,7 @@ PROFILE_KEYS = {
 }
 
 
-def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=False, workers=0, timings=False):
+def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=False, workers=0, timings=False, retries=1, timeout_factor=1.0):
     if snapshot_path(name).exists():
         print(warning(f'Snapshot "{name}" already exists.'))
         print()
@@ -71,28 +71,37 @@ def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=F
     # Collect in parallel to reduce wall-clock time. On error, store empty list.
     def run_collect(artifact):
         start = time.perf_counter()
-        try:
-            items = artifact.collect()
-            duration = int((time.perf_counter() - start) * 1000)
-            status = {
-                "status": "success",
-                "count": len(items) if isinstance(items, list) else 0,
-                "duration_ms": duration,
-            }
-            return artifact.key, items, status
-        except Exception as e:  # keep snapshot creation resilient
-            duration = int((time.perf_counter() - start) * 1000)
-            print(warning(f"Collector failed: {artifact.label}: {e}"))
-            status = {
-                "status": "failed",
-                "count": 0,
-                "duration_ms": duration,
-                "error": str(e),
-            }
-            return artifact.key, [], status
+        attempt = 0
+        last_exc = None
+        while attempt < max(1, retries):
+            try:
+                items = artifact.collect()
+                duration = int((time.perf_counter() - start) * 1000)
+                status = {
+                    "status": "success",
+                    "count": len(items) if isinstance(items, list) else 0,
+                    "duration_ms": duration,
+                }
+                return artifact.key, items, status
+            except Exception as e:
+                last_exc = e
+                attempt += 1
+        duration = int((time.perf_counter() - start) * 1000)
+        print(warning(f"Collector failed after {attempt} attempt(s): {artifact.label}: {last_exc}"))
+        status = {
+            "status": "failed",
+            "count": 0,
+            "duration_ms": duration,
+            "error": str(last_exc),
+        }
+        return artifact.key, [], status
 
     collector_status = {}
     max_workers = workers if isinstance(workers, int) and workers > 0 else (min(4, len(selected)) or 1)
+    # Propagate timeout factor to PowerShell runner via env var
+    import os as _os
+    _os.environ["WINSNAP_TIMEOUT_FACTOR"] = str(timeout_factor)
+
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(run_collect, artifact): artifact for artifact in selected}
         for future in as_completed(futures):
