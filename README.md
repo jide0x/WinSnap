@@ -76,6 +76,9 @@ Create a snapshot with a note:
 
 ```bash
 winsnap create <name> --note "your note"
+winsnap create <name> --profile core                 # run core collectors only
+winsnap create <name> --no-hash --no-signature       # disable hashing/signature (troubleshooting)
+winsnap create <name> --workers 8 --timings          # tune parallelism and print durations
 ```
 
 List snapshots:
@@ -94,6 +97,7 @@ Compare snapshots:
 
 ```bash
 winsnap diff <before> <after>
+winsnap diff <before> <after> --all   # show all changes without filtering noise
 ```
 
 Show detailed diff output:

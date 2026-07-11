@@ -66,6 +66,10 @@ Collectors:
     create_parser.add_argument("name")
     create_parser.add_argument("--note", default="", help="Add a note to the snapshot")
     create_parser.add_argument("--profile", choices=["full", "core"], default="full", help="Select collector profile (default: full)")
+    create_parser.add_argument("--no-hash", action="store_true", help="Disable file hashing during snapshot creation")
+    create_parser.add_argument("--no-signature", action="store_true", help="Disable Authenticode signature verification during snapshot creation")
+    create_parser.add_argument("--workers", type=int, default=0, help="Override parallel collector workers (default: 4 or #artifacts)")
+    create_parser.add_argument("--timings", action="store_true", help="Print per-collector durations and statuses after creation")
 
     diff_parser = subparsers.add_parser("diff", help="Compare two snapshots")
     diff_parser.add_argument("before")
@@ -125,7 +129,15 @@ def run_command(args, parser):
         return
 
     if args.command == "create":
-        create_snapshot(args.name, note=args.note, profile=args.profile)
+        create_snapshot(
+            args.name,
+            note=args.note,
+            profile=args.profile,
+            no_hash=args.no_hash,
+            no_signature=args.no_signature,
+            workers=args.workers,
+            timings=args.timings,
+        )
         return
 
     if args.command == "diff":

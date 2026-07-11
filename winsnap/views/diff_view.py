@@ -247,6 +247,16 @@ def print_diff_summary(before, after, diff):
     else:
         print("  None")
     print()
+    # Filtered summary (if present)
+    filtered = diff.get("_filtering") or {}
+    total_filtered = sum((v.get("filtered_added", 0) + v.get("filtered_removed", 0)) for v in filtered.values())
+    if total_filtered:
+        print(bold("Filtered Changes"))
+        for label_key, meta in filtered.items():
+            count = meta.get("filtered_added", 0) + meta.get("filtered_removed", 0)
+            if count:
+                print(f"  {str(label_key).replace('_',' ').title():<22} {count}")
+        print()
     print(bold("Use --details to view full process, service, scheduled task, registry autorun, startup folder, installed software, firewall rule, and network listener entries."))
     print()
 

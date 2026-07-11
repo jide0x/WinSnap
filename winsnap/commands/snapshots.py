@@ -9,7 +9,7 @@ from winsnap.artifacts import ARTIFACTS, SUPPORTED_COLLECTORS
 from winsnap.snapshot_store import delete_snapshot, list_snapshots, load_snapshot, save_snapshot, snapshot_path
 from winsnap.version import VERSION
 from winsnap.views.snapshot_view import print_snapshot_list, print_snapshot_summary
-from winsnap.views.ui import success, warning
+from winsnap.views.ui import success, warning, bold
 from winsnap.files import (
     file_metadata,
     verify_signature,
@@ -38,7 +38,7 @@ PROFILE_KEYS = {
 }
 
 
-def create_snapshot(name, note="", profile="full"):
+def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=False, workers=0, timings=False):
     if snapshot_path(name).exists():
         print(warning(f'Snapshot "{name}" already exists.'))
         print()
@@ -92,7 +92,8 @@ def create_snapshot(name, note="", profile="full"):
             return artifact.key, [], status
 
     collector_status = {}
-    with ThreadPoolExecutor(max_workers=min(4, len(selected)) or 1) as executor:
+    max_workers = workers if isinstance(workers, int) and workers > 0 else (min(4, len(selected)) or 1)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(run_collect, artifact): artifact for artifact in selected}
         for future in as_completed(futures):
             key, items, status = future.result()
@@ -106,7 +107,7 @@ def create_snapshot(name, note="", profile="full"):
     sig_cache = {}
 
     def enrich(path: str):
-        if not path:
+        if not path or no_hash:
             return None
         path_norm = str(path)
         if path_norm not in hash_cache:
@@ -114,16 +115,16 @@ def create_snapshot(name, note="", profile="full"):
             hash_cache[path_norm] = meta
         else:
             meta = hash_cache[path_norm]
-        # Attach signature, cached by sha256 when available
+        # Attach signature unless disabled, cached by sha256 when available
         sig = None
-        sha = meta.get("sha256")
-        if sha:
-            if sha not in sig_cache:
-                sig_cache[sha] = verify_signature(path_norm)
-            sig = sig_cache[sha]
-        else:
-            # signature without hash if hash unavailable (optional)
-            sig = verify_signature(path_norm)
+        if not no_signature:
+            sha = meta.get("sha256")
+            if sha:
+                if sha not in sig_cache:
+                    sig_cache[sha] = verify_signature(path_norm)
+                sig = sig_cache[sha]
+            else:
+                sig = verify_signature(path_norm)
         meta_with_sig = dict(meta)
         meta_with_sig["signature"] = sig
         return meta_with_sig
@@ -154,6 +155,17 @@ def create_snapshot(name, note="", profile="full"):
 
     save_snapshot(snapshot)
     print_snapshot_summary(snapshot)
+
+    # Optional timings summary
+    if timings:
+        print(bold("Collector Status"))
+        for a in selected:
+            st = collector_status.get(a.key, {})
+            status_text = st.get("status", "unknown")
+            dur = st.get("duration_ms", 0)
+            cnt = st.get("count", 0)
+            line = f"  {a.label:<22} {status_text:<8} {cnt:>5} items  {dur:>6} ms"
+            print(line)
 
 
 def show_snapshot(name):
