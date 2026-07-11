@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "winsnap"
+name = "WinSnap"
 version = "1.0.0"
 description = "Lightweight Windows snapshot and change-analysis CLI."
 readme = "README.md"
