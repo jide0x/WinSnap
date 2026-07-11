@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.9.1
+
+- Snapshot performance
+  - Added collector profiles to `winsnap create`:
+    - `full` (default): all collectors
+    - `core`: processes, services, scheduled tasks, registry autoruns, startup folders, local users, local groups
+  - Parallelized collectors during snapshot creation to reduce wall time.
+  - Snapshot metadata records the selected collectors in order.
+  - Failures in individual collectors no longer abort snapshot creation; they record an empty list and a warning.
+
 ## 0.9.0
 
 - New collectors
