@@ -104,6 +104,7 @@ def service_changes(before_service, after_service):
                 "after": after_value,
             }
 
+    add_file_hash_change(changes, before_service, after_service)
     return changes
 
 
@@ -155,6 +156,7 @@ def scheduled_task_changes(before_task, after_task):
                 "after": after_value,
             }
 
+    add_file_hash_change(changes, before_task, after_task)
     return changes
 
 
@@ -204,6 +206,7 @@ def registry_autorun_changes(before_autorun, after_autorun):
             "after": after_value,
         }
 
+    add_file_hash_change(changes, before_autorun, after_autorun)
     return changes
 
 
@@ -255,6 +258,7 @@ def startup_folder_changes(before_item, after_item):
                 "after": after_value,
             }
 
+    add_file_hash_change(changes, before_item, after_item)
     return changes
 
 
@@ -441,7 +445,21 @@ def firewall_rule_changes(before_rule, after_rule):
                 "after": after_value,
             }
 
+    add_file_hash_change(changes, before_rule, after_rule)
     return changes
+
+
+def add_file_hash_change(changes, before_item, after_item):
+    """Record a content change only when both snapshots have valid hashes."""
+    before_file = before_item.get("file")
+    after_file = after_item.get("file")
+    if not isinstance(before_file, dict) or not isinstance(after_file, dict):
+        return
+
+    before_hash = before_file.get("sha256")
+    after_hash = after_file.get("sha256")
+    if before_hash and after_hash and before_hash != after_hash:
+        changes["FileHash"] = {"before": before_hash, "after": after_hash}
 
 
 # Local users

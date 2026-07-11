@@ -25,6 +25,12 @@ class SnapshotValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_snapshot({"name": "x", "created_at": "now", "collectors": ["services", "processes"]})
 
+    def test_future_schema_version_raises(self):
+        with self.assertRaisesRegex(ValueError, "newer than the supported version"):
+            validate_snapshot(
+                {"name": "x", "created_at": "now", "collectors": [], "schema_version": 999}
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

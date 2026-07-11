@@ -49,6 +49,11 @@ def validate_snapshot(snapshot: Dict[str, Any]) -> None:
     schema_version = snapshot.get("schema_version")
     if schema_version is not None and not isinstance(schema_version, int):
         raise ValueError("schema_version must be an integer when present")
+    if schema_version is not None and schema_version > SCHEMA_VERSION:
+        raise ValueError(
+            f"Snapshot schema version {schema_version} is newer than the supported "
+            f"version {SCHEMA_VERSION}. Upgrade WinSnap to read this snapshot."
+        )
     # For now we accept snapshots without schema_version (pre-v1) and treat them as schema 0
 
 

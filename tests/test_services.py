@@ -30,6 +30,25 @@ class ServiceDiffTests(unittest.TestCase):
             {"before": "Stopped", "after": "Running"},
         )
 
+    def test_hash_change_detected_when_both_hashes_exist(self):
+        before = {"services": [service("svc", file={"sha256": "old"})]}
+        after = {"services": [service("svc", file={"sha256": "new"})]}
+
+        diff = diff_services(before, after)
+
+        self.assertEqual(
+            diff["changed"][0]["changes"]["FileHash"],
+            {"before": "old", "after": "new"},
+        )
+
+    def test_missing_legacy_hash_does_not_report_content_change(self):
+        before = {"services": [service("svc")]}
+        after = {"services": [service("svc", file={"sha256": "new"})]}
+
+        diff = diff_services(before, after)
+
+        self.assertEqual(diff["changed"], [])
+
 
 class ScheduledTaskDiffTests(unittest.TestCase):
     def test_diff_scheduled_tasks_added_removed_and_changed(self):
