@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.0-rc1
+
+- Schema v1 header: `schema_version`, `winsnap_version`, `snapshot_id`, `collectors`, and `collector_status` per artifact.
+- Filtering (presentation-only):
+  - Routine process churn is reduced by default; `--all` restores full output.
+  - Ephemeral localhost listeners are deprioritized unless bind-all, service-associated, or paired with new inbound firewall rules.
+  - Trusted signed Microsoft-only FileHash changes are deprioritized (evidence preserved), not hidden.
+- Hashing & Signatures:
+  - Executable file metadata attached (sha256, size, mtime, status) and Authenticode signature (publisher/status).
+  - Deduplicated hashing/signature checks via in-snapshot cache.
+  - Diffs highlight binary content changes.
+- Partial failures:
+  - Collector retries (`--retries`) and timeout factor (`--timeout-factor`) improve resilience.
+  - Diffs skip failed collectors and report reasons.
+- Performance & ergonomics:
+  - Profiles: `full` (default) and `core`.
+  - Parallel collectors; tune with `--workers` and `--timings`.
+  - Optional `--no-hash` and `--no-signature` for troubleshooting.
+- CI:
+  - Windows, Python 3.10/3.12; compile, tests, CLI smoke, and wheel build; wheel-install smoke in a fresh venv.
+- Docs & policy: LICENSE, CONTRIBUTING, SECURITY, schema docs.
+
 ## 0.9.1
 
 - Snapshot performance

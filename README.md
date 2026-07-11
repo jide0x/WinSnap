@@ -5,7 +5,7 @@ WinSnap is a lightweight Windows snapshot and change-analysis CLI.
 
 It captures selected Windows system state, saves it as JSON, and helps you compare snapshots to understand what changed over time.
 
-Current version: `0.9.1`
+Current version: `1.0.0rc1`
 
 Installation
 ------------
@@ -222,6 +222,10 @@ Filtering
 By default, `winsnap diff` reduces routine process churn to keep output readable. Use `--all` to see every change.
 
 WinSnap never deletes evidence; filtered items remain in the diff internally.
+
+Default filtering also deprioritizes:
+- Ephemeral localhost listeners without service association or matching new inbound firewall rules
+- Trusted signed Microsoft-only binary content changes (evidence preserved and visible with `--all`)
 
 Permissions
 -----------
