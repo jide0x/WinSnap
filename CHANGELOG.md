@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+- Corrected the PyPI package metadata and release publishing configuration.
+- Included the final v1 compatibility fixes for file-hash comparisons and unsupported future snapshot schemas.
+- Updated release-facing version references consistently across the CLI, package metadata, README, and schema documentation.
+
 ## 1.0.0
 
 - Stable release based on 1.0.0-rc1 with no functional changes beyond version updates.

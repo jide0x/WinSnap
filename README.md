@@ -5,7 +5,7 @@ WinSnap is a lightweight Windows snapshot and change-analysis CLI.
 
 It captures selected Windows system state, saves it as JSON, and helps you compare snapshots to understand what changed over time.
 
-Current version: `1.0.0`
+Current version: `1.0.2`
 
 Installation
 ------------
