@@ -62,9 +62,10 @@ Collectors:
 
     subparsers = parser.add_subparsers(dest="command", parser_class=WinSnapArgumentParser)
 
-    create_parser = subparsers.add_parser("create", help="Create a process/service/scheduled task/registry autorun/startup folder/network listener snapshot")
+    create_parser = subparsers.add_parser("create", help="Create a process/service/scheduled task/registry autorun/startup folder/local users/local groups/installed software/network listener/firewall rule snapshot")
     create_parser.add_argument("name")
     create_parser.add_argument("--note", default="", help="Add a note to the snapshot")
+    create_parser.add_argument("--profile", choices=["full", "core"], default="full", help="Select collector profile (default: full)")
 
     diff_parser = subparsers.add_parser("diff", help="Compare two snapshots")
     diff_parser.add_argument("before")
@@ -123,7 +124,7 @@ def run_command(args, parser):
         return
 
     if args.command == "create":
-        create_snapshot(args.name, note=args.note)
+        create_snapshot(args.name, note=args.note, profile=args.profile)
         return
 
     if args.command == "diff":
