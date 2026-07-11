@@ -26,8 +26,10 @@ def validate_snapshot(snapshot: Dict[str, Any]) -> None:
             raise ValueError(f"Snapshot missing required field: {key}")
 
     # Validate collectors presence
-    collectors = snapshot_collectors(snapshot)
-    if not isinstance(collectors, list):
+    # If explicit keys are present, enforce type
+    if "collectors" in snapshot and not isinstance(snapshot.get("collectors"), list):
+        raise ValueError("Snapshot collectors must be a list")
+    if "collector" in snapshot and not isinstance(snapshot.get("collector"), list):
         raise ValueError("Snapshot collectors must be a list")
 
     # Validate schema version when present

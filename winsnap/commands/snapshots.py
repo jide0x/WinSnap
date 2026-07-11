@@ -10,6 +10,17 @@ from winsnap.snapshot_store import delete_snapshot, list_snapshots, load_snapsho
 from winsnap.version import VERSION
 from winsnap.views.snapshot_view import print_snapshot_list, print_snapshot_summary
 from winsnap.views.ui import success, warning
+from winsnap.files import (
+    file_metadata,
+    verify_signature,
+    resolve_executable_from_process,
+    resolve_executable_from_service,
+    resolve_executable_from_task,
+    resolve_executable_from_autorun,
+    resolve_executable_from_startup_item,
+    resolve_executable_from_firewall_rule,
+)
+import time
 
 
 # Profiles define which artifacts to collect (in stable order defined by ARTIFACTS)
@@ -59,17 +70,84 @@ def create_snapshot(name, note="", profile="full"):
 
     # Collect in parallel to reduce wall-clock time. On error, store empty list.
     def run_collect(artifact):
+        start = time.perf_counter()
         try:
-            return artifact.key, artifact.collect()
+            items = artifact.collect()
+            duration = int((time.perf_counter() - start) * 1000)
+            status = {
+                "status": "success",
+                "count": len(items) if isinstance(items, list) else 0,
+                "duration_ms": duration,
+            }
+            return artifact.key, items, status
         except Exception as e:  # keep snapshot creation resilient
+            duration = int((time.perf_counter() - start) * 1000)
             print(warning(f"Collector failed: {artifact.label}: {e}"))
-            return artifact.key, []
+            status = {
+                "status": "failed",
+                "count": 0,
+                "duration_ms": duration,
+                "error": str(e),
+            }
+            return artifact.key, [], status
 
+    collector_status = {}
     with ThreadPoolExecutor(max_workers=min(4, len(selected)) or 1) as executor:
         futures = {executor.submit(run_collect, artifact): artifact for artifact in selected}
         for future in as_completed(futures):
-            key, result = future.result()
-            snapshot[key] = result
+            key, items, status = future.result()
+            snapshot[key] = items
+            collector_status[key] = status
+
+    snapshot["collector_status"] = collector_status
+
+    # Hashing & signatures: enrich items with file metadata and signature; use caches to avoid duplicates
+    hash_cache = {}
+    sig_cache = {}
+
+    def enrich(path: str):
+        if not path:
+            return None
+        path_norm = str(path)
+        if path_norm not in hash_cache:
+            meta = file_metadata(path_norm)
+            hash_cache[path_norm] = meta
+        else:
+            meta = hash_cache[path_norm]
+        # Attach signature, cached by sha256 when available
+        sig = None
+        sha = meta.get("sha256")
+        if sha:
+            if sha not in sig_cache:
+                sig_cache[sha] = verify_signature(path_norm)
+            sig = sig_cache[sha]
+        else:
+            # signature without hash if hash unavailable (optional)
+            sig = verify_signature(path_norm)
+        meta_with_sig = dict(meta)
+        meta_with_sig["signature"] = sig
+        return meta_with_sig
+
+    # Helper: attach file field when path resolvable
+    def attach_file(items, resolver):
+        if not isinstance(items, list):
+            return
+        for it in items:
+            try:
+                path = resolver(it)
+            except Exception:
+                path = None
+            if path:
+                meta = enrich(path)
+                if meta:
+                    it["file"] = meta
+
+    attach_file(snapshot.get("processes"), resolve_executable_from_process)
+    attach_file(snapshot.get("services"), resolve_executable_from_service)
+    attach_file(snapshot.get("scheduled_tasks"), resolve_executable_from_task)
+    attach_file(snapshot.get("registry_autoruns"), resolve_executable_from_autorun)
+    attach_file(snapshot.get("startup_folders"), resolve_executable_from_startup_item)
+    attach_file(snapshot.get("firewall_rules"), resolve_executable_from_firewall_rule)
 
     # Record legacy singular key for backward compatibility if someone inspects raw JSON with old tools
     snapshot["collector"] = snapshot.get("collectors", [])

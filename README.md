@@ -212,3 +212,19 @@ WinSnap is being built toward local Windows security change analysis: capture sy
 Planned future collectors may include:
 
 - Defender settings
+Filtering
+---------
+
+By default, `winsnap diff` reduces routine process churn to keep output readable. Use `--all` to see every change.
+
+WinSnap never deletes evidence; filtered items remain in the diff internally.
+
+Permissions
+-----------
+
+Some collectors may require elevated privileges to return complete data (e.g., firewall rules). WinSnap records collector status; diffs skip categories that failed to collect.
+
+Schema
+------
+
+Snapshots include a schema version and collector status. See `docs/SCHEMA.md` for details.

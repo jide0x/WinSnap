@@ -30,8 +30,17 @@ def diff_snapshots(before_name, after_name, details=False, show_all=False):
     print_diff_summary(before, after, diff)
 
 
+def _collector_success(snapshot, key):
+    status_map = snapshot.get("collector_status", {}) or {}
+    status = status_map.get(key, {})
+    return not status or status.get("status") == "success"
+
+
 def diff_if_compatible(before, after, artifact):
     if artifact.key not in before or artifact.key not in after:
+        return empty_diff()
+    # Skip comparison if collection failed in either snapshot
+    if not _collector_success(before, artifact.key) or not _collector_success(after, artifact.key):
         return empty_diff()
     return artifact.diff(before, after)
 
@@ -43,7 +52,16 @@ def compatibility_report(before, after):
         after_has_collector = artifact.key in after
 
         if before_has_collector and after_has_collector:
-            report.append({"label": artifact.label, "status": "compared"})
+            # Check collection status; if failed in either, mark skipped with reason
+            if _collector_success(before, artifact.key) and _collector_success(after, artifact.key):
+                report.append({"label": artifact.label, "status": "compared"})
+            else:
+                reason = (
+                    "collection failed in before snapshot"
+                    if not _collector_success(before, artifact.key)
+                    else "collection failed in after snapshot"
+                )
+                report.append({"label": artifact.label, "status": "skipped", "reason": reason})
         elif not before_has_collector and not after_has_collector:
             report.append({"label": artifact.label, "status": "skipped", "reason": "not present in either snapshot"})
         elif not before_has_collector:
