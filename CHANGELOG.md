@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0
+
+- Stable release based on 1.0.0-rc1 with no functional changes beyond version updates.
+- See 1.0.0-rc1 notes for full details on schema v1, filtering, hashing/signatures, partial-failure resilience, CI, and documentation.
+
 ## 1.0.0-rc1
 
 - Schema v1 header: `schema_version`, `winsnap_version`, `snapshot_id`, `collectors`, and `collector_status` per artifact.
