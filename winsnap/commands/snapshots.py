@@ -3,8 +3,9 @@ import getpass
 import platform
 import socket
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import uuid
 
-from winsnap.artifacts import ARTIFACTS
+from winsnap.artifacts import ARTIFACTS, SUPPORTED_COLLECTORS
 from winsnap.snapshot_store import delete_snapshot, list_snapshots, load_snapshot, save_snapshot, snapshot_path
 from winsnap.version import VERSION
 from winsnap.views.snapshot_view import print_snapshot_list, print_snapshot_summary
@@ -42,13 +43,17 @@ def create_snapshot(name, note="", profile="full"):
     selected = [a for a in ARTIFACTS if a.key in selected_keys]
 
     snapshot = {
+        "schema_version": 1,
+        "winsnap_version": VERSION,
+        "snapshot_id": str(uuid.uuid4()),
         "name": name,
         "version": VERSION,
         "hostname": socket.gethostname(),
         "username": getpass.getuser(),
         "windows_version": platform.platform(),
         "created_at": datetime.now().isoformat(timespec="seconds"),
-        "collector": [artifact.key for artifact in selected],
+        # Write the new plural key going forward; views/readers tolerate older 'collector'
+        "collectors": [artifact.key for artifact in selected],
         "note": note,
     }
 
@@ -65,6 +70,9 @@ def create_snapshot(name, note="", profile="full"):
         for future in as_completed(futures):
             key, result = future.result()
             snapshot[key] = result
+
+    # Record legacy singular key for backward compatibility if someone inspects raw JSON with old tools
+    snapshot["collector"] = snapshot.get("collectors", [])
 
     save_snapshot(snapshot)
     print_snapshot_summary(snapshot)

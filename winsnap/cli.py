@@ -71,6 +71,7 @@ Collectors:
     diff_parser.add_argument("before")
     diff_parser.add_argument("after")
     diff_parser.add_argument("--details", action="store_true", help="Show detailed process changes")
+    diff_parser.add_argument("--all", action="store_true", help="Show all changes without filtering noise")
 
     inspect_parser = subparsers.add_parser("inspect", help="Inspect matching processes/services/scheduled tasks/registry autoruns/startup items/network listeners in one snapshot")
     inspect_parser.add_argument("snapshot")
@@ -128,7 +129,7 @@ def run_command(args, parser):
         return
 
     if args.command == "diff":
-        diff_snapshots(args.before, args.after, details=args.details)
+        diff_snapshots(args.before, args.after, details=args.details, show_all=args.all)
         return
 
     if args.command == "inspect":

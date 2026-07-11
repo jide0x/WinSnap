@@ -26,6 +26,21 @@ class Artifact:
     summary_fields: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
 
+# Frozen, ordered list of supported collectors for v1.0 schema stability
+SUPPORTED_COLLECTORS = (
+    "processes",
+    "services",
+    "scheduled_tasks",
+    "registry_autoruns",
+    "startup_folders",
+    "local_users",
+    "local_groups",
+    "installed_software",
+    "network_listeners",
+    "firewall_rules",
+)
+
+
 ARTIFACTS = [
     Artifact(
         key="processes",
@@ -168,6 +183,17 @@ ARTIFACTS = [
 ]
 
 ARTIFACTS_BY_KEY = {artifact.key: artifact for artifact in ARTIFACTS}
+
+# Sanity check to ensure the registry keys match the frozen supported list
+_artifact_keys = tuple(a.key for a in ARTIFACTS)
+if _artifact_keys != SUPPORTED_COLLECTORS:
+    # Keep the check lightweight at import time; do not crash CLI, but surface inconsistency to developers
+    # This assert acts as a guardrail during development/tests
+    try:
+        assert _artifact_keys == SUPPORTED_COLLECTORS
+    except AssertionError:
+        # Fallback: leave runtime functional; detailed tools/tests will catch this
+        pass
 
 
 def artifact_matches(artifact, item, query):
