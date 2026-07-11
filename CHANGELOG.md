@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0
+
+- New collectors
+  - Installed Software: Win32 Uninstall registry + UWP apps. Captures Name, Version, Publisher, Install date (ISO where parseable), Install location, Uninstall command. Excludes SystemComponent entries and Windows Updates/Hotfixes by default.
+  - Firewall Rules: Active Windows Defender Firewall rules with Name, Direction, Action, Enabled, Protocol, Local/Remote ports, Program, Profiles.
+- Inspect/Search
+  - Both new collectors are included automatically via the artifact registry.
+  - Firewall Rules: `Enabled` is searchable and summarized in Inspect.
+- Diff
+  - Added/Removed/Changed sections for Installed Software and Firewall Rules.
+  - Pairing: highlights new Allow Inbound firewall rules that align with new network listeners.
+- Notes
+  - Snapshot JSON schema remains lists of dicts; existing snapshots are fully compatible and show "skipped" for collectors not present.
+
 ## 0.7.1
 
 - Refactor: introduce a central artifact registry that drives snapshot creation, diff dispatch, inspect, and search. Adding a new collector now requires a single registration instead of edits across commands and views.
