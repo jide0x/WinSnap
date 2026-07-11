@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.9.0
+
+- New collectors
+  - Local Users: Name, SID, Enabled, LocalAccount, PasswordRequired, PasswordExpires, LastLogon, Description. LastLogon is not used for diff to avoid noise but is shown in inspect/details.
+  - Local Groups: Membership for key groups (Administrators, Users, Remote Desktop Users, Backup Operators, Hyper-V Administrators, Remote Management Users). No AD recursion.
+- Diff
+  - Local Users: track changes to Enabled, PasswordRequired, PasswordExpires, Description.
+  - Local Groups: track membership changes (added/removed members shown in details).
+- Registry order
+  - Reordered artifacts per spec: Processes, Services, Scheduled Tasks, Registry Autoruns, Startup Folders, Local Users, Local Groups, Installed Software, Network Listeners, Firewall Rules.
+
 ## 0.8.0
 
 - New collectors

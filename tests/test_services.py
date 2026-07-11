@@ -2,7 +2,7 @@ import unittest
 
 from winsnap.artifacts import ARTIFACTS_BY_KEY
 from winsnap.commands.diff import compatibility_report, diff_if_compatible
-from winsnap.differ import diff_firewall_rules, diff_installed_software, diff_network_listeners, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
+from winsnap.differ import diff_firewall_rules, diff_installed_software, diff_local_groups, diff_local_users, diff_network_listeners, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
 
 
 class ServiceDiffTests(unittest.TestCase):
@@ -181,6 +181,49 @@ class FirewallRuleDiffTests(unittest.TestCase):
         self.assertIn("Action", diff["changed"][0]["changes"])  # action changed
 
 
+class LocalUserDiffTests(unittest.TestCase):
+    def test_diff_local_users_added_removed_and_changed(self):
+        before = {
+            "local_users": [
+                local_user("alice", sid="S-1-5-21-1000", Enabled=False),
+            ]
+        }
+        after = {
+            "local_users": [
+                local_user("alice", sid="S-1-5-21-1000", Enabled=True),  # enabled changed
+                local_user("bob", sid="S-1-5-21-2000", Enabled=True),     # new user
+            ]
+        }
+
+        diff = diff_local_users(before, after)
+
+        self.assertEqual([u["Name"] for u in diff["added"]], ["bob"])  # bob added
+        self.assertEqual([u["Name"] for u in diff["removed"]], [])       # none removed
+        self.assertEqual(diff["changed"][0]["after"]["Enabled"], True)
+        self.assertIn("Enabled", diff["changed"][0]["changes"])  # enabled changed
+
+
+class LocalGroupDiffTests(unittest.TestCase):
+    def test_diff_local_groups_added_removed_and_changed(self):
+        before = {
+            "local_groups": [
+                local_group("Administrators", ["MACHINE\\Admin"]),
+            ]
+        }
+        after = {
+            "local_groups": [
+                local_group("Administrators", ["MACHINE\\Admin", "MACHINE\\Bob"]),  # added Bob
+            ]
+        }
+
+        diff = diff_local_groups(before, after)
+
+        self.assertEqual([g["Group"] for g in diff["added"]], [])
+        self.assertEqual([g["Group"] for g in diff["removed"]], [])
+        self.assertEqual(diff["changed"][0]["after"]["Group"], "Administrators")
+        self.assertIn("Members", diff["changed"][0]["changes"])  # membership changed
+
+
 class CompatibilityTests(unittest.TestCase):
     def test_compatibility_report_marks_missing_before_collectors_as_skipped(self):
         before = {"processes": []}
@@ -190,6 +233,9 @@ class CompatibilityTests(unittest.TestCase):
             "scheduled_tasks": [],
             "registry_autoruns": [],
             "startup_folders": [],
+            "local_users": [],
+            "local_groups": [],
+            "installed_software": [],
             "network_listeners": [],
             "firewall_rules": [],
         }
@@ -215,15 +261,23 @@ class CompatibilityTests(unittest.TestCase):
         )
         self.assertEqual(
             report[5],
-            {"label": "Installed Software", "status": "skipped", "reason": "not present in either snapshot"},
+            {"label": "Local Users", "status": "skipped", "reason": "not present in before snapshot"},
         )
         self.assertEqual(
             report[6],
-            {"label": "Firewall Rules", "status": "skipped", "reason": "not present in before snapshot"},
+            {"label": "Local Groups", "status": "skipped", "reason": "not present in before snapshot"},
         )
         self.assertEqual(
             report[7],
+            {"label": "Installed Software", "status": "skipped", "reason": "not present in before snapshot"},
+        )
+        self.assertEqual(
+            report[8],
             {"label": "Network Listeners", "status": "skipped", "reason": "not present in before snapshot"},
+        )
+        self.assertEqual(
+            report[9],
+            {"label": "Firewall Rules", "status": "skipped", "reason": "not present in before snapshot"},
         )
 
     def test_diff_if_compatible_skips_missing_collector(self):
@@ -342,6 +396,24 @@ def installed_software_uwp(package_id, name, version, **overrides):
         "UninstallString": None,
     }
     return data
+
+
+def local_user(name, sid, **overrides):
+    data = {
+        "Name": name,
+        "SID": sid,
+        "Enabled": overrides.get("Enabled", True),
+        "LocalAccount": True,
+        "PasswordRequired": overrides.get("PasswordRequired"),
+        "PasswordExpires": overrides.get("PasswordExpires"),
+        "LastLogon": overrides.get("LastLogon"),
+        "Description": overrides.get("Description"),
+    }
+    return data
+
+
+def local_group(group, members):
+    return {"Group": group, "Members": list(members)}
 
 
 def firewall_rule(name, **overrides):

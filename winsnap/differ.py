@@ -442,3 +442,84 @@ def firewall_rule_changes(before_rule, after_rule):
             }
 
     return changes
+
+
+# Local users
+
+def local_user_key(user):
+    return (user.get("SID") or user.get("Name") or "").lower()
+
+
+def diff_local_users(before, after):
+    before_users = {
+        local_user_key(user): user
+        for user in before.get("local_users", [])
+        if local_user_key(user)
+    }
+    after_users = {
+        local_user_key(user): user
+        for user in after.get("local_users", [])
+        if local_user_key(user)
+    }
+
+    added_keys = after_users.keys() - before_users.keys()
+    removed_keys = before_users.keys() - after_users.keys()
+    common_keys = before_users.keys() & after_users.keys()
+
+    changed = []
+    for key in sorted(common_keys):
+        b = before_users[key]
+        a = after_users[key]
+        changes = local_user_changes(b, a)
+        if changes:
+            changed.append({"before": b, "after": a, "changes": changes})
+
+    return {
+        "added": [after_users[k] for k in sorted(added_keys)],
+        "removed": [before_users[k] for k in sorted(removed_keys)],
+        "changed": changed,
+    }
+
+
+def local_user_changes(before_user, after_user):
+    # Exclude LastLogon and LocalAccount from diff noise
+    fields = ["Enabled", "PasswordRequired", "PasswordExpires", "Description"]
+    changes = {}
+    for field in fields:
+        if before_user.get(field) != after_user.get(field):
+            changes[field] = {"before": before_user.get(field), "after": after_user.get(field)}
+    return changes
+
+
+# Local groups
+
+def local_group_key(item):
+    return (item.get("Group") or "").lower()
+
+
+def diff_local_groups(before, after):
+    before_groups = {local_group_key(i): i for i in before.get("local_groups", []) if local_group_key(i)}
+    after_groups = {local_group_key(i): i for i in after.get("local_groups", []) if local_group_key(i)}
+
+    added_keys = after_groups.keys() - before_groups.keys()
+    removed_keys = before_groups.keys() - after_groups.keys()
+    common_keys = before_groups.keys() & after_groups.keys()
+
+    changed = []
+    for key in sorted(common_keys):
+        b = before_groups[key]
+        a = after_groups[key]
+        b_members = set(str(x) for x in (b.get("Members") or []))
+        a_members = set(str(x) for x in (a.get("Members") or []))
+        if b_members != a_members:
+            changed.append({
+                "before": b,
+                "after": a,
+                "changes": {"Members": {"before": sorted(b_members), "after": sorted(a_members)}},
+            })
+
+    return {
+        "added": [after_groups[k] for k in sorted(added_keys)],
+        "removed": [before_groups[k] for k in sorted(removed_keys)],
+        "changed": changed,
+    }

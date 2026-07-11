@@ -46,6 +46,8 @@ Collectors:
   scheduled tasks
   registry autoruns
   startup folders
+  local users
+  local groups
   installed software
   firewall rules
   network listeners

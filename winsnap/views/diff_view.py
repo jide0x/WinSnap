@@ -48,6 +48,8 @@ def print_diff_summary(before, after, diff):
     listener_diff = diff["network_listeners"]
     firewall_diff = diff.get("firewall_rules", {"added": [], "removed": [], "changed": []})
     software_diff = diff.get("installed_software", {"added": [], "removed": [], "changed": []})
+    user_diff = diff.get("local_users", {"added": [], "removed": [], "changed": []})
+    group_diff = diff.get("local_groups", {"added": [], "removed": [], "changed": []})
     added = process_diff["added"]
     removed = process_diff["removed"]
     added_counts = Counter(process_name(process) for process in added)
@@ -87,6 +89,12 @@ def print_diff_summary(before, after, diff):
     print(f"  {'Added startup items':<27} {len(startup_diff['added'])}")
     print(f"  {'Removed startup items':<27} {len(startup_diff['removed'])}")
     print(f"  {'Changed startup items':<27} {len(startup_diff['changed'])}")
+    print(f"  {'Added local users':<27} {len(user_diff['added'])}")
+    print(f"  {'Removed local users':<27} {len(user_diff['removed'])}")
+    print(f"  {'Changed local users':<27} {len(user_diff['changed'])}")
+    print(f"  {'Added local groups':<27} {len(group_diff['added'])}")
+    print(f"  {'Removed local groups':<27} {len(group_diff['removed'])}")
+    print(f"  {'Changed local groups':<27} {len(group_diff['changed'])}")
     print(f"  {'Added listeners':<27} {len(listener_diff['added'])}")
     print(f"  {'Removed listeners':<27} {len(listener_diff['removed'])}")
     print(f"  {'Changed listeners':<27} {len(listener_diff['changed'])}")
@@ -198,6 +206,30 @@ def print_diff_summary(before, after, diff):
     else:
         print("  None")
     print()
+    print(bold("Local User Changes"))
+    if user_diff["added"] or user_diff["removed"] or user_diff["changed"]:
+        for item in user_diff["added"][:10]:
+            print(f"  + {local_user_name(item)}")
+        for item in user_diff["removed"][:10]:
+            print(f"  - {local_user_name(item)}")
+        for item in user_diff["changed"][:10]:
+            fields = ", ".join(item["changes"].keys())
+            print(f"  ~ {local_user_name(item['after'])} ({fields})")
+    else:
+        print("  None")
+    print()
+
+    print(bold("Local Group Membership Changes"))
+    if group_diff["added"] or group_diff["removed"] or group_diff["changed"]:
+        for item in group_diff["added"][:10]:
+            print(f"  + {local_group_name(item)}")
+        for item in group_diff["removed"][:10]:
+            print(f"  - {local_group_name(item)}")
+        for item in group_diff["changed"][:10]:
+            print(f"  ~ {local_group_name(item['after'])} (Members)")
+    else:
+        print("  None")
+    print()
 
     print(bold("New Services With New Listeners"))
     correlations = new_services_with_new_listeners(service_diff, listener_diff)
@@ -231,6 +263,8 @@ def print_detailed_diff(before, after, diff):
     listener_diff = diff["network_listeners"]
     software_diff = diff.get("installed_software", {"added": [], "removed": [], "changed": []})
     firewall_diff = diff.get("firewall_rules", {"added": [], "removed": [], "changed": []})
+    user_diff = diff.get("local_users", {"added": [], "removed": [], "changed": []})
+    group_diff = diff.get("local_groups", {"added": [], "removed": [], "changed": []})
 
     print(success(f"Added Processes ({len(process_diff['added'])})"))
     print()
@@ -440,6 +474,82 @@ def print_detailed_diff(before, after, diff):
         print()
 
     print()
+    print(success(f"Added Local Users ({len(user_diff['added'])})"))
+    print()
+    for item in user_diff["added"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_local_user(item)
+        print()
+
+    print()
+    print(error(f"Removed Local Users ({len(user_diff['removed'])})"))
+    print()
+    for item in user_diff["removed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_local_user(item)
+        print()
+
+    print()
+    print(bold(f"Changed Local Users ({len(user_diff['changed'])})"))
+    print()
+    for item in user_diff["changed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_local_user(item["after"])
+        print()
+        print(bold(" Changes"))
+        for field, values in item["changes"].items():
+            print(f"  {field}")
+            print(f"    Before: {values['before']}")
+            print(f"    After : {values['after']}")
+        print()
+
+    print()
+    print(success(f"Added Local Groups ({len(group_diff['added'])})"))
+    print()
+    for item in group_diff["added"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_local_group(item)
+        print()
+
+    print()
+    print(error(f"Removed Local Groups ({len(group_diff['removed'])})"))
+    print()
+    for item in group_diff["removed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_local_group(item)
+        print()
+
+    print()
+    print(bold(f"Changed Local Groups ({len(group_diff['changed'])})"))
+    print()
+    for item in group_diff["changed"]:
+        print(info(rule(DIFF_WIDTH, "─")))
+        print()
+        print_local_group(item["after"])
+        print()
+        print(bold(" Changes"))
+        # Show member diffs if present
+        members_change = item.get("changes", {}).get("Members")
+        if isinstance(members_change, dict):
+            before_members = set(members_change.get("before", []))
+            after_members = set(members_change.get("after", []))
+            added_m = sorted(after_members - before_members)
+            removed_m = sorted(before_members - after_members)
+            if added_m:
+                print("  Added Members")
+                for m in added_m:
+                    print(f"    + {m}")
+            if removed_m:
+                print("  Removed Members")
+                for m in removed_m:
+                    print(f"    - {m}")
+        print()
+    print()
     print(success(f"Added Firewall Rules ({len(firewall_diff['added'])})"))
     print()
     for rule_item in firewall_diff["added"]:
@@ -577,6 +687,39 @@ def print_network_listener(listener):
     print(f" Process     {listener.get('ProcessName') or 'Unknown'}")
     print(f" Path        {listener.get('ProcessPath') or 'Unknown'}")
     print(f" Services    {format_listener_value(listener.get('ServiceNames'))}")
+
+
+def local_user_name(user):
+    return user.get("Name") or "Unknown"
+
+
+def print_local_user(user):
+    print(bold(local_user_name(user)))
+    print()
+    print(f" Name        {user.get('Name') or 'Unknown'}")
+    print(f" SID         {user.get('SID') or 'Unknown'}")
+    print(f" Enabled     {user.get('Enabled')}")
+    print(f" Local       {user.get('LocalAccount')}")
+    print(f" Pwd Req     {user.get('PasswordRequired')}")
+    print(f" Pwd Expires {user.get('PasswordExpires')}")
+    print(f" Last Logon  {user.get('LastLogon') or 'Unknown'}")
+    print(f" Description {user.get('Description') or 'Unknown'}")
+
+
+def local_group_name(item):
+    return item.get("Group") or "Unknown"
+
+
+def print_local_group(item):
+    print(bold(local_group_name(item)))
+    print()
+    members = item.get("Members") or []
+    if not members:
+        print(" Members     None")
+    else:
+        print(" Members")
+        for m in members:
+            print(f"  - {m}")
 
 
 def firewall_rule_name(rule):

@@ -3,8 +3,10 @@ from dataclasses import dataclass, field
 from winsnap.collectors import collect_network_listeners, collect_processes, collect_registry_autoruns, collect_scheduled_tasks, collect_services, collect_startup_folders
 from winsnap.collectors.installed_software import collect_installed_software
 from winsnap.collectors.firewall_rules import collect_firewall_rules
-from winsnap.differ import diff_firewall_rules, diff_installed_software, diff_network_listeners, diff_processes, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
-from winsnap.views.diff_view import autorun_name, network_listener_name, print_firewall_rule, print_installed_software, print_network_listener, print_registry_autorun, print_scheduled_task, print_service, print_startup_item, process_name, service_name, software_name, startup_item_name, task_name, firewall_rule_name
+from winsnap.collectors.local_users import collect_local_users
+from winsnap.collectors.local_groups import collect_local_groups
+from winsnap.differ import diff_firewall_rules, diff_installed_software, diff_local_groups, diff_local_users, diff_network_listeners, diff_processes, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
+from winsnap.views.diff_view import autorun_name, network_listener_name, print_firewall_rule, print_installed_software, print_local_group, print_local_user, print_network_listener, print_registry_autorun, print_scheduled_task, print_service, print_startup_item, process_name, service_name, software_name, startup_item_name, task_name, firewall_rule_name, local_user_name, local_group_name
 from winsnap.views.process_view import print_process
 
 
@@ -95,6 +97,33 @@ ARTIFACTS = [
         summary_fields=(("Startup Item Scopes", "Scope"),),
     ),
     Artifact(
+        key="local_users",
+        label="Local Users",
+        short_label="Users",
+        matching_label="Matching local users",
+        inspect_section_label="Local Users",
+        detail_section_label="Local User Entries",
+        collect=collect_local_users,
+        diff=diff_local_users,
+        search_fields=("Name", "SID", "Enabled", "LocalAccount", "PasswordRequired", "PasswordExpires", "LastLogon", "Description"),
+        name=local_user_name,
+        print_item=print_local_user,
+        summary_fields=(("Enabled", "Enabled"),),
+    ),
+    Artifact(
+        key="local_groups",
+        label="Local Groups",
+        short_label="Groups",
+        matching_label="Matching local groups",
+        inspect_section_label="Local Groups",
+        detail_section_label="Local Group Entries",
+        collect=collect_local_groups,
+        diff=diff_local_groups,
+        search_fields=("Group", "Members"),
+        name=local_group_name,
+        print_item=print_local_group,
+    ),
+    Artifact(
         key="installed_software",
         label="Installed Software",
         short_label="Soft",
@@ -109,20 +138,6 @@ ARTIFACTS = [
         summary_fields=(("Publishers", "Publisher"),),
     ),
     Artifact(
-        key="firewall_rules",
-        label="Firewall Rules",
-        short_label="FW",
-        matching_label="Matching firewall rules",
-        inspect_section_label="Firewall Rules",
-        detail_section_label="Firewall Rule Entries",
-        collect=collect_firewall_rules,
-        diff=diff_firewall_rules,
-        search_fields=("Name", "Direction", "Action", "Protocol", "LocalPort", "RemotePort", "Program", "Profiles"),
-        name=firewall_rule_name,
-        print_item=print_firewall_rule,
-        summary_fields=(("Directions", "Direction"), ("Actions", "Action")),
-    ),
-    Artifact(
         key="network_listeners",
         label="Network Listeners",
         short_label="Net",
@@ -135,6 +150,20 @@ ARTIFACTS = [
         name=network_listener_name,
         print_item=print_network_listener,
         summary_fields=(("Network Listener Protocols", "Protocol"),),
+    ),
+    Artifact(
+        key="firewall_rules",
+        label="Firewall Rules",
+        short_label="FW",
+        matching_label="Matching firewall rules",
+        inspect_section_label="Firewall Rules",
+        detail_section_label="Firewall Rule Entries",
+        collect=collect_firewall_rules,
+        diff=diff_firewall_rules,
+        search_fields=("Name", "Direction", "Action", "Enabled", "Protocol", "LocalPort", "RemotePort", "Program", "Profiles"),
+        name=firewall_rule_name,
+        print_item=print_firewall_rule,
+        summary_fields=(("Directions", "Direction"), ("Actions", "Action"), ("Enabled", "Enabled")),
     ),
 ]
 

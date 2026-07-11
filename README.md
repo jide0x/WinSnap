@@ -35,8 +35,11 @@ Current collectors:
 - Scheduled tasks
 - Registry autoruns
 - Startup folders
+- Local users
+- Local groups
 - Installed software
 - Network listeners
+- Firewall rules
 
 Core Workflow
 -------------
