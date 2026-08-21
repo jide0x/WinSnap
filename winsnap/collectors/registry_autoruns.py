@@ -1,27 +1,55 @@
-from winsnap.collectors.powershell import run_powershell_json
+import winreg
+
+# (Hive label, winreg root, registry path). KeyPath is emitted as "Hive\\path"
+# to match the previous PowerShell collector's output format.
+_AUTORUN_KEYS = [
+    ("HKCU", winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run"),
+    ("HKCU", winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\RunOnce"),
+    ("HKLM", winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Run"),
+    ("HKLM", winreg.HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\RunOnce"),
+    ("HKLM", winreg.HKEY_LOCAL_MACHINE, r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run"),
+    ("HKLM", winreg.HKEY_LOCAL_MACHINE, r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce"),
+]
 
 
-REGISTRY_AUTORUN_COLLECTION_TIMEOUT_SECONDS = 30
+def _coerce_str(value):
+    """Coerce a registry value to string, mirroring PowerShell's [string] cast."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (list, tuple)):
+        return " ".join(str(v) for v in value)
+    return str(value)
 
 
 def collect_registry_autoruns():
-    return run_powershell_json(
-        "$keys = @(" \
-        "@{Hive='HKCU';Path='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'}," \
-        "@{Hive='HKCU';Path='HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce'}," \
-        "@{Hive='HKLM';Path='HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'}," \
-        "@{Hive='HKLM';Path='HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce'}," \
-        "@{Hive='HKLM';Path='HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Run'}," \
-        "@{Hive='HKLM';Path='HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\RunOnce'}" \
-        "); " \
-        "$results = @(); " \
-        "foreach ($key in $keys) { " \
-        "if (Test-Path $key.Path) { " \
-        "$props = Get-ItemProperty -Path $key.Path; " \
-        "foreach ($prop in $props.PSObject.Properties) { " \
-        "if ($prop.Name -notlike 'PS*') { " \
-        "$results += [pscustomobject]@{Hive=$key.Hive;KeyPath=$key.Path.Replace(':','');ValueName=$prop.Name;Value=[string]$prop.Value} " \
-        "} } } }; " \
-        "$results | ConvertTo-Json -Depth 4",
-        REGISTRY_AUTORUN_COLLECTION_TIMEOUT_SECONDS,
-    )
+    """Collect Run/RunOnce values from the standard HKCU/HKLM autorun keys."""
+    results = []
+    for hive_label, hive, subkey in _AUTORUN_KEYS:
+        try:
+            key = winreg.OpenKey(hive, subkey, 0, winreg.KEY_READ)
+        except OSError:
+            continue
+        with key:
+            index = 0
+            while True:
+                try:
+                    value_name, value, value_type = winreg.EnumValue(key, index)
+                except OSError:
+                    break
+                if value_type == winreg.REG_EXPAND_SZ and isinstance(value, str):
+                    try:
+                        value = winreg.ExpandEnvironmentStrings(value)
+                    except Exception:
+                        pass
+                results.append({
+                    "Hive": hive_label,
+                    "KeyPath": f"{hive_label}\\{subkey}",
+                    "ValueName": value_name,
+                    "Value": _coerce_str(value),
+                })
+                index += 1
+
+    results.sort(key=lambda r: (r["Hive"], r["KeyPath"], r["ValueName"]))
+    return results

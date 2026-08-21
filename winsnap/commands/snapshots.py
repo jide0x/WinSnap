@@ -42,6 +42,7 @@ def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=F
             return
 
     # Select artifacts according to profile, preserving ARTIFACTS order
+    total_start = time.perf_counter()
     selected_keys = PROFILE_KEYS.get(profile, PROFILE_KEYS["full"]) if PROFILE_KEYS else [a.key for a in ARTIFACTS]
     selected = [a for a in ARTIFACTS if a.key in selected_keys]
 
@@ -107,14 +108,15 @@ def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=F
     # then hash/verify signatures on the unique set (in parallel) and attach back.
     # Caching only applies when hashing is enabled (nothing to cache otherwise).
     cache_entries = load_cache() if (cache and not no_hash) else None
-    enrich_snapshot(snapshot, no_hash=no_hash, no_signature=no_signature, workers=workers, cache=cache_entries)
+    phase_timings = {} if timings else None
+    enrich_snapshot(snapshot, no_hash=no_hash, no_signature=no_signature, workers=workers, cache=cache_entries, timings=phase_timings)
     if cache_entries is not None:
         save_cache(cache_entries)
 
     # Record legacy singular key for backward compatibility if someone inspects raw JSON with old tools
     snapshot["collector"] = snapshot.get("collectors", [])
 
-    save_snapshot(snapshot)
+    save_snapshot(snapshot, timings=phase_timings)
     print_snapshot_summary(snapshot)
 
     # Optional timings summary
@@ -127,6 +129,24 @@ def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=F
             cnt = st.get("count", 0)
             line = f"  {a.label:<22} {status_text:<8} {cnt:>5} items  {dur:>6} ms"
             print(line)
+
+        def _phase(label, key):
+            value = phase_timings.get(key, 0)
+            print(f"  {label:<22} {value:>8} ms")
+
+        print()
+        print(bold("Enrichment"))
+        _phase("Path resolution", "path_resolution_ms")
+        _phase("SHA-256 hashing", "hash_ms")
+        _phase("Signature checks", "signature_ms")
+        print()
+        print(bold("Serialization"))
+        _phase("JSON encoding", "json_encode_ms")
+        _phase("File save", "file_write_ms")
+        print()
+        print(bold("Total"))
+        total_ms = int((time.perf_counter() - total_start) * 1000)
+        print(f"  {'Total':<22} {total_ms:>8} ms")
 
 
 def show_snapshot(name):

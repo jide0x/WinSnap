@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Tuple
 
@@ -57,19 +58,25 @@ def enrich_unique_paths(
     no_signature: bool = False,
     workers: int = 0,
     cache: Dict[str, Any] = None,
+    timings: Dict[str, Any] = None,
 ) -> Dict[str, Dict[str, Any]]:
     """Hash, verify signature, and collect metadata for each unique path.
 
     Returns a mapping {path: metadata}; paths skipped under no_hash are omitted.
     Hashing runs in parallel; signatures are verified in a single native call.
     When `cache` is provided, unchanged files reuse cached hashes/signatures.
+    When `timings` is provided, it is populated with `hash_ms` and `signature_ms`.
     """
     if not paths:
+        if timings is not None:
+            timings["hash_ms"] = 0
+            timings["signature_ms"] = 0
         return {}
 
     max_workers = workers if isinstance(workers, int) and workers > 0 else min(4, len(paths) or 1)
 
     # Phase 1: hash + metadata for each unique path (Python, I/O bound)
+    hash_start = time.perf_counter()
     hashed: Dict[str, Dict[str, Any]] = {}
     if not no_hash:
         if max_workers == 1:
@@ -82,12 +89,15 @@ def enrich_unique_paths(
                 for future in as_completed(futures):
                     meta = future.result()
                     hashed[meta["path"]] = meta
+    if timings is not None:
+        timings["hash_ms"] = int((time.perf_counter() - hash_start) * 1000)
 
     # Phase 2: signature verification via native WinVerifyTrust. Only
     # successfully hashed files are checked, deduplicated by sha256 (identical
     # content via different paths is verified once). WinVerifyTrust is I/O
     # bound and releases the GIL, so the unique paths are split into chunks
     # verified concurrently. Cached signatures are reused without re-verifying.
+    sig_start = time.perf_counter()
     signatures_by_sha: Dict[str, Dict[str, Any]] = {}
     if not no_signature:
         sha_to_path: Dict[str, str] = {}
@@ -113,6 +123,9 @@ def enrich_unique_paths(
                 signatures_by_sha[sha] = sig
                 if cache is not None and sig is not None:
                     cache.setdefault(cache_key(path), {})["signature"] = sig
+
+    if timings is not None:
+        timings["signature_ms"] = int((time.perf_counter() - sig_start) * 1000)
 
     enriched: Dict[str, Dict[str, Any]] = {}
     for path in paths:
@@ -175,15 +188,24 @@ def enrich_snapshot(
     no_signature: bool = False,
     workers: int = 0,
     cache: Dict[str, Any] = None,
+    timings: Dict[str, Any] = None,
 ) -> None:
-    """Full pipeline: discover referenced paths, dedupe, enrich, attach back."""
+    """Full pipeline: discover referenced paths, dedupe, enrich, attach back.
+
+    When `timings` is provided, it is populated with `path_resolution_ms`,
+    `hash_ms`, and `signature_ms`.
+    """
+    resolve_start = time.perf_counter()
     discovered = discover_referenced_paths(snapshot)
     unique_paths = dedupe_paths(discovered)
+    if timings is not None:
+        timings["path_resolution_ms"] = int((time.perf_counter() - resolve_start) * 1000)
     enriched = enrich_unique_paths(
         unique_paths,
         no_hash=no_hash,
         no_signature=no_signature,
         workers=workers,
         cache=cache,
+        timings=timings,
     )
     attach_file_metadata(discovered, enriched)

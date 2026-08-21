@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import re
+import time
 
 
 SNAPSHOT_DIR = Path("snapshots")
@@ -23,12 +24,21 @@ def snapshot_path(name):
     return SNAPSHOT_DIR / f"{name}.json"
 
 
-def save_snapshot(snapshot):
+def save_snapshot(snapshot, timings=None):
     ensure_snapshot_dir()
     path = snapshot_path(snapshot["name"])
 
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(snapshot, f, indent=2)
+    if timings is not None:
+        encode_start = time.perf_counter()
+        encoded = json.dumps(snapshot, indent=2)
+        timings["json_encode_ms"] = int((time.perf_counter() - encode_start) * 1000)
+        write_start = time.perf_counter()
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(encoded)
+        timings["file_write_ms"] = int((time.perf_counter() - write_start) * 1000)
+    else:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f, indent=2)
 
     return path
 
