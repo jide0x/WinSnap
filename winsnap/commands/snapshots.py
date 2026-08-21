@@ -6,20 +6,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import uuid
 
 from winsnap.artifacts import ARTIFACTS, SUPPORTED_COLLECTORS
+from winsnap.enrichment import enrich_snapshot
+from winsnap.files.cache import load_cache, save_cache
 from winsnap.snapshot_store import delete_snapshot, list_snapshots, load_snapshot, save_snapshot, snapshot_path
 from winsnap.version import VERSION
 from winsnap.views.snapshot_view import print_snapshot_list, print_snapshot_summary
 from winsnap.views.ui import success, warning, bold
-from winsnap.files import (
-    file_metadata,
-    verify_signature,
-    resolve_executable_from_process,
-    resolve_executable_from_service,
-    resolve_executable_from_task,
-    resolve_executable_from_autorun,
-    resolve_executable_from_startup_item,
-    resolve_executable_from_firewall_rule,
-)
 import time
 
 
@@ -38,7 +30,7 @@ PROFILE_KEYS = {
 }
 
 
-def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=False, workers=0, timings=False, retries=1, timeout_factor=1.0):
+def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=False, workers=0, timings=False, retries=1, timeout_factor=1.0, cache=False):
     if snapshot_path(name).exists():
         print(warning(f'Snapshot "{name}" already exists.'))
         print()
@@ -111,53 +103,13 @@ def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=F
 
     snapshot["collector_status"] = collector_status
 
-    # Hashing & signatures: enrich items with file metadata and signature; use caches to avoid duplicates
-    hash_cache = {}
-    sig_cache = {}
-
-    def enrich(path: str):
-        if not path or no_hash:
-            return None
-        path_norm = str(path)
-        if path_norm not in hash_cache:
-            meta = file_metadata(path_norm)
-            hash_cache[path_norm] = meta
-        else:
-            meta = hash_cache[path_norm]
-        # Attach signature unless disabled, cached by sha256 when available
-        sig = None
-        if not no_signature:
-            sha = meta.get("sha256")
-            if sha:
-                if sha not in sig_cache:
-                    sig_cache[sha] = verify_signature(path_norm)
-                sig = sig_cache[sha]
-            else:
-                sig = verify_signature(path_norm)
-        meta_with_sig = dict(meta)
-        meta_with_sig["signature"] = sig
-        return meta_with_sig
-
-    # Helper: attach file field when path resolvable
-    def attach_file(items, resolver):
-        if not isinstance(items, list):
-            return
-        for it in items:
-            try:
-                path = resolver(it)
-            except Exception:
-                path = None
-            if path:
-                meta = enrich(path)
-                if meta:
-                    it["file"] = meta
-
-    attach_file(snapshot.get("processes"), resolve_executable_from_process)
-    attach_file(snapshot.get("services"), resolve_executable_from_service)
-    attach_file(snapshot.get("scheduled_tasks"), resolve_executable_from_task)
-    attach_file(snapshot.get("registry_autoruns"), resolve_executable_from_autorun)
-    attach_file(snapshot.get("startup_folders"), resolve_executable_from_startup_item)
-    attach_file(snapshot.get("firewall_rules"), resolve_executable_from_firewall_rule)
+    # Enrichment pipeline: discover referenced executables, dedupe paths,
+    # then hash/verify signatures on the unique set (in parallel) and attach back.
+    # Caching only applies when hashing is enabled (nothing to cache otherwise).
+    cache_entries = load_cache() if (cache and not no_hash) else None
+    enrich_snapshot(snapshot, no_hash=no_hash, no_signature=no_signature, workers=workers, cache=cache_entries)
+    if cache_entries is not None:
+        save_cache(cache_entries)
 
     # Record legacy singular key for backward compatibility if someone inspects raw JSON with old tools
     snapshot["collector"] = snapshot.get("collectors", [])

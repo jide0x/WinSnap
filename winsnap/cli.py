@@ -68,6 +68,8 @@ Collectors:
     create_parser.add_argument("--profile", choices=["full", "core"], default="full", help="Select collector profile (default: full)")
     create_parser.add_argument("--no-hash", action="store_true", help="Disable file hashing during snapshot creation")
     create_parser.add_argument("--no-signature", action="store_true", help="Disable Authenticode signature verification during snapshot creation")
+    create_parser.add_argument("--fast", action="store_true", help="Shortcut for --no-hash --no-signature")
+    create_parser.add_argument("--cache", action="store_true", help="Reuse cached file hashes/signatures for unchanged files (size + mtime)")
     create_parser.add_argument("--workers", type=int, default=0, help="Override parallel collector workers (default: 4 or #artifacts)")
     create_parser.add_argument("--timings", action="store_true", help="Print per-collector durations and statuses after creation")
     create_parser.add_argument("--retries", type=int, default=1, help="Retry failed collectors up to N times (default: 1)")
@@ -135,12 +137,13 @@ def run_command(args, parser):
             args.name,
             note=args.note,
             profile=args.profile,
-            no_hash=args.no_hash,
-            no_signature=args.no_signature,
+            no_hash=args.no_hash or args.fast,
+            no_signature=args.no_signature or args.fast,
             workers=args.workers,
             timings=args.timings,
             retries=args.retries,
             timeout_factor=args.timeout_factor,
+            cache=args.cache,
         )
         return
 

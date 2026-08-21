@@ -2,7 +2,7 @@ import os
 import unittest
 from pathlib import Path
 
-from winsnap.snapshot_store import save_snapshot, load_snapshot, delete_snapshot, snapshot_path
+from winsnap.snapshot_store import save_snapshot, load_snapshot, delete_snapshot, snapshot_path, list_snapshots
 
 
 class SnapshotStoreTests(unittest.TestCase):
@@ -30,6 +30,15 @@ class SnapshotStoreTests(unittest.TestCase):
         name = "does_not_exist"
         with self.assertRaises(FileNotFoundError):
             load_snapshot(name)
+
+    def test_list_snapshots_excludes_dotfiles(self):
+        dotfile = Path("snapshots") / ".hashcache.json"
+        dotfile.write_text("{}", encoding="utf-8")
+        try:
+            names = [p.name for p in list_snapshots()]
+            self.assertNotIn(".hashcache.json", names)
+        finally:
+            dotfile.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

@@ -7,4 +7,4 @@ from .resolve import (
     resolve_executable_from_startup_item,
     resolve_executable_from_firewall_rule,
 )
-from .signature import verify_signature
+from .signature import verify_signature, verify_signatures_bulk

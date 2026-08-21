@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Tuple
 TRUSTED_PUBLISHERS = {
     "Microsoft Corporation",
     "Microsoft Windows",
+    "Microsoft Windows Publisher",
+    "Microsoft Windows Hardware Compatibility Publisher",
 }
 
 

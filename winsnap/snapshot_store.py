@@ -45,7 +45,7 @@ def load_snapshot(name):
 
 def list_snapshots():
     ensure_snapshot_dir()
-    return sorted(SNAPSHOT_DIR.glob("*.json"))
+    return sorted(p for p in SNAPSHOT_DIR.glob("*.json") if not p.name.startswith("."))
 
 
 def delete_snapshot(name):

@@ -1,0 +1,23 @@
+Artifact diffs
+
+Primary artifacts
+
+These tell the core system-change story:
+
+processes
+services
+scheduled tasks
+registry autoruns
+startup folders
+installed software
+local users/groups
+Context artifacts
+
+These strengthen or explain another finding:
+
+network listeners
+firewall rules
+hashes
+signatures
+file locations
+owning user/account

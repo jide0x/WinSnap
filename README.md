@@ -78,7 +78,9 @@ Create a snapshot with a note:
 ```bash
 winsnap create <name> --note "your note"
 winsnap create <name> --profile core                 # run core collectors only
+winsnap create <name> --fast                         # shortcut for --no-hash --no-signature
 winsnap create <name> --no-hash --no-signature       # disable hashing/signature (troubleshooting)
+winsnap create <name> --cache                        # reuse cached hashes/signatures (see Caching)
 winsnap create <name> --workers 8 --timings          # tune parallelism and print durations
 ```
 
@@ -227,6 +229,13 @@ WinSnap never deletes evidence; filtered items remain in the diff internally.
 Default filtering also deprioritizes:
 - Ephemeral localhost listeners without service association or matching new inbound firewall rules
 - Trusted signed Microsoft-only binary content changes (evidence preserved and visible with `--all`)
+
+Caching
+-------
+
+`winsnap create <name> --cache` stores file hashes and signatures in `snapshots/.hashcache.json` and reuses them when a file's size and modification time are unchanged. This makes repeat snapshots much faster (only changed binaries are re-read).
+
+Security note: caching is opt-in and off by default. A file's modification time and size can be spoofed, so an attacker who alters a binary and resets its timestamp could evade detection when caching is enabled. Always re-hash (no `--cache`) for high-assurance comparisons.
 
 Permissions
 -----------

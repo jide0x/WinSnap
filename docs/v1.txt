@@ -1,0 +1,74 @@
+
+## What I’d still add for v1
+
+### Must-have
+
+**Installed Software**
+
+* Name
+* Version
+* Publisher
+* Install date
+* Install location
+* Uninstall command
+
+This gives context for legitimate installs and helps with future multi-endpoint inventory.
+
+**Firewall Rules**
+
+* Name
+* Direction
+* Action
+* Enabled
+* Protocol
+* Local/remote ports
+* Program path
+* Profiles
+
+This pairs directly with your listener collector.
+
+**Local Users and Group Membership**
+
+* Account name
+* Enabled/disabled
+* Last logon if available
+* Administrators membership
+* Remote Desktop Users membership
+
+This catches new accounts and privilege changes.
+
+**Drivers**
+
+* Name
+* State
+* Start mode
+* Path
+* Type
+
+Drivers are high-value changes and belong in a Windows security snapshot tool.
+
+## Strong optional v1 collector
+
+**Security Configuration**
+Keep it narrow:
+
+* RDP enabled
+* Defender exclusions
+* Firewall profile states
+* UAC settings
+* PowerShell execution policy
+* Proxy settings
+* Hosts file hash
+
+After those, stop adding collectors and work on:
+
+```text
+Filtering
+Hashing
+Signature Verification
+SQLite
+Tests
+```
+
+## Repo cleanup
+
