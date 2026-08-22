@@ -1,20 +1,27 @@
-import csv
 import ctypes
 from ctypes import wintypes
-import io
 import re
 import subprocess
 
+from winsnap.collectors import taskscheduler
+
 # ---------------------------------------------------------------------------
-# Native scheduled task collection via a single `schtasks /query /xml` dump,
-# replacing the previous Get-ScheduledTask PowerShell round-trip. Trigger and
-# action strings are reproduced to match the CIM provider's output format.
-#
-# Note: the ephemeral "Running" state is not exposed by the task XML, so tasks
-# currently executing are reported as "Ready" (their persistent state).
+# Scheduled task collection: definitions are parsed from a single
+# `schtasks /query /xml` dump (author, run-as user, triggers, actions), while
+# the runtime Ready/Disabled/Running state comes from the Task Scheduler COM
+# API (taskscheduler.enumerate_tasks). Replaces the previous Get-ScheduledTask
+# PowerShell round-trip.
 # ---------------------------------------------------------------------------
 
 _SCHTASKS_TIMEOUT = 30
+
+_TASK_STATE_NAMES = {
+    0: "Unknown",
+    1: "Disabled",
+    2: "Queued",
+    3: "Ready",
+    4: "Running",
+}
 
 _WELL_KNOWN_TRIGGER_CLASS = {
     "BootTrigger": "MSFT_TaskBootTrigger",
@@ -128,12 +135,10 @@ def _run_schtasks(args):
 
 def collect_scheduled_tasks():
     xml_text = _run_schtasks(["schtasks", "/query", "/xml"])
-    csv_text = _run_schtasks(["schtasks", "/query", "/fo", "CSV", "/nh"])
 
-    status_by_path = {}
-    for row in csv.reader(io.StringIO(csv_text)):
-        if len(row) >= 3 and row[0]:
-            status_by_path[row[0].strip()] = row[2].strip()
+    state_by_path = {}
+    for path, name, state in taskscheduler.enumerate_tasks():
+        state_by_path[path] = state
 
     tasks = re.findall(r"<Task\b.*?</Task>", xml_text, re.DOTALL)
 
@@ -176,13 +181,9 @@ def collect_scheduled_tasks():
                 value = f"{value} {arg.group(1).strip()}"
             action_strings.append(value)
 
-        status = status_by_path.get(full_path)
-        if status == "Disabled":
-            state = "Disabled"
-        elif status == "Running":
-            state = "Running"
-        elif status == "Ready":
-            state = "Ready"
+        state_value = state_by_path.get(full_path)
+        if state_value is not None:
+            state = _TASK_STATE_NAMES.get(state_value, "Ready")
         else:
             state = "Disabled" if re.search(r"<Enabled>false</Enabled>", task_xml) else "Ready"
 

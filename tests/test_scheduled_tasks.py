@@ -1,6 +1,8 @@
 import unittest
 
+from winsnap.collectors import taskscheduler
 from winsnap.collectors.scheduled_tasks import (
+    _TASK_STATE_NAMES,
     _collapse,
     _split_task_path,
     _trigger_class,
@@ -38,6 +40,22 @@ class ScheduledTaskHelperTests(unittest.TestCase):
 
     def test_split_task_path_subfolder(self):
         self.assertEqual(_split_task_path("\\Folder\\Sub\\TaskName"), ("\\Folder\\Sub\\", "TaskName"))
+
+    def test_task_state_names(self):
+        self.assertEqual(_TASK_STATE_NAMES[0], "Unknown")
+        self.assertEqual(_TASK_STATE_NAMES[1], "Disabled")
+        self.assertEqual(_TASK_STATE_NAMES[2], "Queued")
+        self.assertEqual(_TASK_STATE_NAMES[3], "Ready")
+        self.assertEqual(_TASK_STATE_NAMES[4], "Running")
+
+
+class TaskSchedulerComTests(unittest.TestCase):
+    def test_enumerate_tasks_returns_tuples(self):
+        tasks = taskscheduler.enumerate_tasks()
+        self.assertIsInstance(tasks, list)
+        for entry in tasks:
+            self.assertIsInstance(entry, tuple)
+            self.assertEqual(len(entry), 3)
 
 
 if __name__ == "__main__":
