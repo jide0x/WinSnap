@@ -3,9 +3,11 @@ import os
 import tempfile
 
 from winsnap.enrichment import (
+    EnrichStats,
     attach_file_metadata,
     dedupe_paths,
     discover_referenced_paths,
+    enrich_snapshot,
     enrich_unique_paths,
 )
 
@@ -63,6 +65,39 @@ class EnrichmentDiscoveryTests(unittest.TestCase):
         enriched = enrich_unique_paths(["Z:/missing/file.exe"], workers=2)
         self.assertEqual(enriched["Z:/missing/file.exe"]["hash_status"], "missing")
         self.assertIsNone(enriched["Z:/missing/file.exe"]["signature"])
+
+
+class EnrichmentStatsTests(unittest.TestCase):
+    def test_enrich_snapshot_records_counters_and_timings(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "app.exe")
+            with open(p, "wb") as f:
+                f.write(b"content")
+            snapshot = {"processes": [{"Name": "app.exe", "ExecutablePath": p}]}
+            stats = EnrichStats()
+            enrich_snapshot(snapshot, no_signature=True, workers=1, stats=stats)
+            self.assertEqual(stats.counters["refs_discovered"], 1)
+            self.assertEqual(stats.counters["unique_paths"], 1)
+            self.assertEqual(stats.counters["files_hashed"], 1)
+            self.assertIn("hash_ms", stats.timings)
+            self.assertIn("enrichment_wall_ms", stats.timings)
+
+    def test_hash_cache_hit_and_miss_counters(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "app.exe")
+            with open(p, "wb") as f:
+                f.write(b"content")
+            stats = EnrichStats()
+            enrich_unique_paths([p], no_signature=True, workers=1, stats=stats)
+            self.assertEqual(stats.counters["files_hashed"], 1)
+            # Second pass with the populated cache hits rather than re-hashing.
+            cache = {}
+            enrich_unique_paths([p], no_signature=True, workers=1, cache=cache)
+            stats2 = EnrichStats()
+            enrich_unique_paths([p], no_signature=True, workers=1, cache=cache, stats=stats2)
+            self.assertEqual(stats2.counters["hash_cache_hits"], 1)
+            self.assertEqual(stats2.counters.get("hash_cache_misses", 0), 0)
+            self.assertEqual(stats2.counters.get("files_hashed", 0), 0)
 
 
 if __name__ == "__main__":

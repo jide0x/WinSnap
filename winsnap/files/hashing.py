@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from pathlib import Path
 from typing import Dict, Any
 from datetime import datetime
@@ -19,11 +20,15 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
-def file_metadata(path_str: str, cache: Dict[str, Any] = None) -> Dict[str, Any]:
+def file_metadata(path_str: str, cache: Dict[str, Any] = None, stats=None) -> Dict[str, Any]:
     """Collect file metadata (size, mtime, sha256).
 
     When `cache` is provided, a file whose size and mtime are unchanged from the
     cached entry reuses the cached hash instead of re-reading the file.
+
+    When `stats` is provided (an object with `add_ms`/`incr`), it records
+    `cache_lookup_ms`, `hash_cache_hits`, `hash_cache_misses`, and
+    `files_hashed`.
     """
     meta: Dict[str, Any] = {
         "path": path_str,
@@ -58,13 +63,18 @@ def file_metadata(path_str: str, cache: Dict[str, Any] = None) -> Dict[str, Any]
 
         # Cache hit: reuse the previous hash if size and mtime are unchanged.
         if cache is not None:
+            lookup_start = time.perf_counter()
             entry = cache.get(key)
-            if (
+            hit = (
                 isinstance(entry, dict)
                 and entry.get("size") == size
                 and entry.get("mtime_ns") == mtime_ns
                 and entry.get("sha256")
-            ):
+            )
+            if stats is not None:
+                stats.add_ms("cache_lookup_ms", (time.perf_counter() - lookup_start) * 1000)
+                stats.incr("hash_cache_hits" if hit else "hash_cache_misses")
+            if hit:
                 meta["exists"] = True
                 meta["size"] = entry.get("size")
                 meta["modified_at"] = entry.get("modified_at")
@@ -82,6 +92,8 @@ def file_metadata(path_str: str, cache: Dict[str, Any] = None) -> Dict[str, Any]
             meta["hash_status"] = "access_denied"
         except Exception:
             meta["hash_status"] = "error"
+        if stats is not None:
+            stats.incr("files_hashed")
 
         if cache is not None:
             entry = cache.get(key)

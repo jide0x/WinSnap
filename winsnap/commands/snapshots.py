@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import uuid
 
 from winsnap.artifacts import ARTIFACTS, SUPPORTED_COLLECTORS
-from winsnap.enrichment import enrich_snapshot
+from winsnap.enrichment import EnrichStats, enrich_snapshot
 from winsnap.files.cache import load_cache, save_cache
 from winsnap.snapshot_store import delete_snapshot, list_snapshots, load_snapshot, save_snapshot, snapshot_path
 from winsnap.version import VERSION
@@ -95,33 +95,54 @@ def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=F
     import os as _os
     _os.environ["WINSNAP_TIMEOUT_FACTOR"] = str(timeout_factor)
 
+    collect_start = time.perf_counter()
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(run_collect, artifact): artifact for artifact in selected}
         for future in as_completed(futures):
             key, items, status = future.result()
             snapshot[key] = items
             collector_status[key] = status
+    collection_wall_ms = int((time.perf_counter() - collect_start) * 1000)
 
     snapshot["collector_status"] = collector_status
 
     # Enrichment pipeline: discover referenced executables, dedupe paths,
     # then hash/verify signatures on the unique set (in parallel) and attach back.
     # Caching only applies when hashing is enabled (nothing to cache otherwise).
-    cache_entries = load_cache() if (cache and not no_hash) else None
-    phase_timings = {} if timings else None
-    enrich_snapshot(snapshot, no_hash=no_hash, no_signature=no_signature, workers=workers, cache=cache_entries, timings=phase_timings)
+    cache_entries = None
+    cache_load_ms = 0
+    if cache and not no_hash:
+        load_start = time.perf_counter()
+        cache_entries = load_cache()
+        cache_load_ms = int((time.perf_counter() - load_start) * 1000)
+
+    stats = EnrichStats() if timings else None
+    enrich_snapshot(snapshot, no_hash=no_hash, no_signature=no_signature, workers=workers, cache=cache_entries, stats=stats)
+
+    cache_save_ms = 0
     if cache_entries is not None:
+        save_start = time.perf_counter()
         save_cache(cache_entries)
+        cache_save_ms = int((time.perf_counter() - save_start) * 1000)
 
     # Record legacy singular key for backward compatibility if someone inspects raw JSON with old tools
     snapshot["collector"] = snapshot.get("collectors", [])
 
-    save_snapshot(snapshot, timings=phase_timings)
+    output_timings = {} if timings else None
+    output_start = time.perf_counter()
+    save_snapshot(snapshot, timings=output_timings)
+    output_wall_ms = int((time.perf_counter() - output_start) * 1000)
     print_snapshot_summary(snapshot)
 
     # Optional timings summary
     if timings:
-        print(bold("Collector Status"))
+        def _ms(key):
+            return stats.timings.get(key, 0)
+
+        def _cnt(key):
+            return stats.counters.get(key, 0)
+
+        print(bold("Collection"))
         for a in selected:
             st = collector_status.get(a.key, {})
             status_text = st.get("status", "unknown")
@@ -129,20 +150,33 @@ def create_snapshot(name, note="", profile="full", no_hash=False, no_signature=F
             cnt = st.get("count", 0)
             line = f"  {a.label:<22} {status_text:<8} {cnt:>5} items  {dur:>6} ms"
             print(line)
-
-        def _phase(label, key):
-            value = phase_timings.get(key, 0)
-            print(f"  {label:<22} {value:>8} ms")
+        print(f"  {'Collection wall clock':<22} {collection_wall_ms:>8} ms")
 
         print()
         print(bold("Enrichment"))
-        _phase("Path resolution", "path_resolution_ms")
-        _phase("SHA-256 hashing", "hash_ms")
-        _phase("Signature checks", "signature_ms")
+        print(f"  {'Cache load':<22} {cache_load_ms:>8} ms")
+        print(f"  {'Path resolution':<22} {_ms('path_resolution_ms'):>8} ms")
+        print(f"  {'Cache lookup':<22} {_ms('cache_lookup_ms'):>8} ms")
+        print(f"  {'SHA-256 hashing':<22} {_ms('hash_ms'):>8} ms")
+        print(f"  {'Signature checks':<22} {_ms('signature_ms'):>8} ms")
+        print(f"  {'Enrichment wall clock':<22} {_ms('enrichment_wall_ms'):>8} ms")
         print()
-        print(bold("Serialization"))
-        _phase("JSON encoding", "json_encode_ms")
-        _phase("File save", "file_write_ms")
+        print(f"  {'Refs discovered':<22} {_cnt('refs_discovered'):>8}")
+        print(f"  {'Unique paths':<22} {_cnt('unique_paths'):>8}")
+        print(f"  {'Hash cache hits':<22} {_cnt('hash_cache_hits'):>8}")
+        print(f"  {'Hash cache misses':<22} {_cnt('hash_cache_misses'):>8}")
+        print(f"  {'Files hashed':<22} {_cnt('files_hashed'):>8}")
+        print(f"  {'Signature cache hits':<22} {_cnt('sig_cache_hits'):>8}")
+        print(f"  {'Signature cache misses':<22} {_cnt('sig_cache_misses'):>8}")
+        print(f"  {'Files verified':<22} {_cnt('files_verified'):>8}")
+
+        print()
+        print(bold("Output"))
+        print(f"  {'Cache save':<22} {cache_save_ms:>8} ms")
+        print(f"  {'JSON encoding':<22} {output_timings.get('json_encode_ms', 0):>8} ms")
+        print(f"  {'File save':<22} {output_timings.get('file_write_ms', 0):>8} ms")
+        print(f"  {'Output wall clock':<22} {output_wall_ms:>8} ms")
+
         print()
         print(bold("Total"))
         total_ms = int((time.perf_counter() - total_start) * 1000)

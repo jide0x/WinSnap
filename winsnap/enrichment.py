@@ -1,11 +1,33 @@
 from __future__ import annotations
 
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Tuple
 
 from winsnap.files import file_metadata, verify_signatures_bulk
 from winsnap.files.cache import cache_key
+
+
+class EnrichStats:
+    """Thread-safe accumulator for enrichment timings (ms) and counters."""
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.timings: Dict[str, int] = {}
+        self.counters: Dict[str, int] = {}
+
+    def add_ms(self, key: str, ms: float):
+        with self._lock:
+            self.timings[key] = self.timings.get(key, 0) + int(ms)
+
+    def set_ms(self, key: str, ms: float):
+        with self._lock:
+            self.timings[key] = int(ms)
+
+    def incr(self, key: str, n: int = 1):
+        with self._lock:
+            self.counters[key] = self.counters.get(key, 0) + n
 from winsnap.files.resolve import (
     resolve_executable_from_autorun,
     resolve_executable_from_firewall_rule,
@@ -58,19 +80,19 @@ def enrich_unique_paths(
     no_signature: bool = False,
     workers: int = 0,
     cache: Dict[str, Any] = None,
-    timings: Dict[str, Any] = None,
+    stats: "EnrichStats" = None,
 ) -> Dict[str, Dict[str, Any]]:
     """Hash, verify signature, and collect metadata for each unique path.
 
     Returns a mapping {path: metadata}; paths skipped under no_hash are omitted.
     Hashing runs in parallel; signatures are verified in a single native call.
     When `cache` is provided, unchanged files reuse cached hashes/signatures.
-    When `timings` is provided, it is populated with `hash_ms` and `signature_ms`.
+    When `stats` is provided, it is populated with phase timings and counters.
     """
     if not paths:
-        if timings is not None:
-            timings["hash_ms"] = 0
-            timings["signature_ms"] = 0
+        if stats is not None:
+            stats.set_ms("hash_ms", 0)
+            stats.set_ms("signature_ms", 0)
         return {}
 
     max_workers = workers if isinstance(workers, int) and workers > 0 else min(4, len(paths) or 1)
@@ -81,16 +103,16 @@ def enrich_unique_paths(
     if not no_hash:
         if max_workers == 1:
             for path in paths:
-                meta = file_metadata(path, cache)
+                meta = file_metadata(path, cache, stats)
                 hashed[meta["path"]] = meta
         else:
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [executor.submit(file_metadata, path, cache) for path in paths]
+                futures = [executor.submit(file_metadata, path, cache, stats) for path in paths]
                 for future in as_completed(futures):
                     meta = future.result()
                     hashed[meta["path"]] = meta
-    if timings is not None:
-        timings["hash_ms"] = int((time.perf_counter() - hash_start) * 1000)
+    if stats is not None:
+        stats.set_ms("hash_ms", int((time.perf_counter() - hash_start) * 1000))
 
     # Phase 2: signature verification via native WinVerifyTrust. Only
     # successfully hashed files are checked, deduplicated by sha256 (identical
@@ -111,10 +133,16 @@ def enrich_unique_paths(
             cached_sig = _cached_signature(cache, path)
             if cached_sig is not None:
                 signatures_by_sha[sha] = cached_sig
+                if cache is not None and stats is not None:
+                    stats.incr("sig_cache_hits")
             else:
                 to_verify.append(path)
+                if cache is not None and stats is not None:
+                    stats.incr("sig_cache_misses")
 
         if to_verify:
+            if stats is not None:
+                stats.incr("files_verified", len(to_verify))
             bulk = _verify_signatures(to_verify, max_workers)
             for sha, path in sha_to_path.items():
                 if sha in signatures_by_sha:
@@ -124,8 +152,8 @@ def enrich_unique_paths(
                 if cache is not None and sig is not None:
                     cache.setdefault(cache_key(path), {})["signature"] = sig
 
-    if timings is not None:
-        timings["signature_ms"] = int((time.perf_counter() - sig_start) * 1000)
+    if stats is not None:
+        stats.set_ms("signature_ms", int((time.perf_counter() - sig_start) * 1000))
 
     enriched: Dict[str, Dict[str, Any]] = {}
     for path in paths:
@@ -188,24 +216,28 @@ def enrich_snapshot(
     no_signature: bool = False,
     workers: int = 0,
     cache: Dict[str, Any] = None,
-    timings: Dict[str, Any] = None,
+    stats: "EnrichStats" = None,
 ) -> None:
     """Full pipeline: discover referenced paths, dedupe, enrich, attach back.
 
-    When `timings` is provided, it is populated with `path_resolution_ms`,
-    `hash_ms`, and `signature_ms`.
+    When `stats` is provided, it is populated with phase timings and counters.
     """
+    wall_start = time.perf_counter()
     resolve_start = time.perf_counter()
     discovered = discover_referenced_paths(snapshot)
     unique_paths = dedupe_paths(discovered)
-    if timings is not None:
-        timings["path_resolution_ms"] = int((time.perf_counter() - resolve_start) * 1000)
+    if stats is not None:
+        stats.set_ms("path_resolution_ms", (time.perf_counter() - resolve_start) * 1000)
+        stats.incr("refs_discovered", len(discovered))
+        stats.incr("unique_paths", len(unique_paths))
     enriched = enrich_unique_paths(
         unique_paths,
         no_hash=no_hash,
         no_signature=no_signature,
         workers=workers,
         cache=cache,
-        timings=timings,
+        stats=stats,
     )
     attach_file_metadata(discovered, enriched)
+    if stats is not None:
+        stats.set_ms("enrichment_wall_ms", (time.perf_counter() - wall_start) * 1000)
