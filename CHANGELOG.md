@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0
+
+- Performance: ported all collectors off PowerShell to native Win32 APIs (toolhelp snapshots, Service Control Manager, Netapi32, iphlpapi, registry, and .lnk binary parsing), collected in parallel.
+- Scheduled tasks: runtime Ready/Disabled/Running state now comes from the Task Scheduler COM API via a hand-rolled ctypes binding; definitions still parsed from a single `schtasks /query /xml` dump.
+- Enrichment: referenced executables are deduplicated, hashed, and signature-verified in parallel; `--cache` reuses `snapshots/.hashcache.json` for unchanged files.
+- `create --timings` prints per-collector and enrichment phase timings/counters.
+- `create --retries` and `--timeout-factor` improve partial-failure resilience.
+
 ## 1.0.2
 
 - Corrected the PyPI package metadata and release publishing configuration.
