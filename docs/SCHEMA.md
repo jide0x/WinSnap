@@ -7,7 +7,7 @@ Header
 ```json
 {
   "schema_version": 1,
-  "winsnap_version": "1.2.0",
+  "winsnap_version": "1.3.0",
   "snapshot_id": "uuid-value",
   "name": "before",
   "created_at": "2026-07-10T20:56:00",

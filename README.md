@@ -1,248 +1,111 @@
 WinSnap
 =======
 
-WinSnap is a lightweight Windows snapshot and change-analysis CLI.
+WinSnap is a Windows command-line tool that captures system state as JSON snapshots and diffs them to show what changed between two points in time.
 
-It captures selected Windows system state, saves it as JSON, and helps you compare snapshots to understand what changed over time.
+Current version: `1.3.0`
 
-Current version: `1.2.0`
+Install
+-------
 
-Installation
-------------
-
-Using pip:
 ```bash
 pip install WinSnap
 ```
 
-
-From the project folder:
+Or from a checkout:
 
 ```bash
 python -m pip install .
 ```
 
-After installation, run:
+Verify with `winsnap --version`. From a checkout you can also run `python -m winsnap ...` or `.\winsnap.cmd ...` without installing.
 
-```bash
-winsnap --help
-winsnap --version
-```
+Collectors
+----------
 
-Current collectors:
+WinSnap captures ten areas of system state:
 
-- Processes
-- Services
-- Scheduled tasks
-- Registry autoruns
-- Startup folders
-- Local users
-- Local groups
-- Installed software
-- Network listeners
-- Firewall rules
+- Processes (PID, parent, name, path, command line)
+- Services (name, state, start mode, account, path)
+- Scheduled tasks (name, path, state, author, run-as user, triggers, actions)
+- Registry autoruns (Run and RunOnce, HKCU and HKLM including WOW6432Node)
+- Startup folders (user and machine, including .lnk target, arguments, working directory)
+- Local users (name, SID, enabled, account flags, last logon)
+- Local groups (key group membership)
+- Installed software (Win32 uninstall entries and UWP packages)
+- Network listeners (TCP/UDP, local address and port, owning process, services)
+- Firewall rules (direction, action, enabled, protocol, ports, program, profiles)
 
-Core Workflow
--------------
+Quick start
+-----------
 
 ```bash
 winsnap create before --note "clean system"
-winsnap create after --note "after install"
+winsnap create after  --note "after install"
 winsnap diff before after
 winsnap diff before after --details
-```
-
-Without installing, you can run WinSnap from the project folder with `python -m winsnap ...` or `./winsnap.cmd ...`.
-
-Profiles
---------
-
-Use profiles to control which collectors run during snapshot creation:
-
-```bash
-winsnap create <name> --profile full   # default, all collectors
-winsnap create <name> --profile core   # core collectors only (processes, services, tasks, autoruns, startup, local users, local groups)
 ```
 
 Commands
 --------
 
-Create a snapshot:
-
 ```bash
-winsnap create <name>
+winsnap create <name>                      create a snapshot
+winsnap create <name> --note "..."         add a note
+winsnap create <name> --profile core       core collectors only
+winsnap create <name> --fast               skip hashing and signatures
+winsnap create <name> --cache              reuse cached hashes/signatures
+winsnap create <name> --workers 8          tune parallelism
+
+winsnap list                               list snapshots
+winsnap show <name>                        snapshot summary
+winsnap diff <before> <after>              compare two snapshots
+winsnap diff <before> <after> --all        show unfiltered changes
+winsnap diff <before> <after> --details    full detail
+winsnap inspect <snapshot> <query>         search one snapshot
+winsnap search <query>                     search all snapshots
+winsnap delete <name>                      delete a snapshot
+winsnap version                            show the version
 ```
 
-Create a snapshot with a note:
+`--fast` is shorthand for `--no-hash --no-signature`.
 
-```bash
-winsnap create <name> --note "your note"
-winsnap create <name> --profile core                 # run core collectors only
-winsnap create <name> --fast                         # shortcut for --no-hash --no-signature
-winsnap create <name> --no-hash --no-signature       # disable hashing/signature (troubleshooting)
-winsnap create <name> --cache                        # reuse cached hashes/signatures (see Caching)
-winsnap create <name> --workers 8 --timings          # tune parallelism and print durations
-```
+Profiles
+--------
 
-List snapshots:
+- `full` (default): all collectors.
+- `core`: processes, services, scheduled tasks, registry autoruns, startup folders, local users, and local groups.
 
-```bash
-winsnap list
-```
+Diff and filtering
+------------------
 
-Show snapshot metadata:
+By default `winsnap diff` suppresses routine churn so real changes stand out. Use `--all` to see everything.
 
-```bash
-winsnap show <name>
-```
+- Process identity is the executable, not the command line, so a process whose arguments change is not reported as added and removed.
+- Service process IDs are ignored, since they change on every restart.
+- Ephemeral UDP listeners from shared service hosts (svchost.exe) are deprioritized unless they pair with a new inbound firewall rule.
+- Trusted, signed Microsoft-only binary content changes are deprioritized.
 
-Compare snapshots:
+Filtered items are never dropped. They remain in the diff internally and return with `--all`.
 
-```bash
-winsnap diff <before> <after>
-winsnap diff <before> <after> --all   # show all changes without filtering noise
-```
+Storage
+-------
 
-Show detailed diff output:
-
-```bash
-winsnap diff <before> <after> --details
-```
-
-Inspect matching entries inside one snapshot:
-
-```bash
-winsnap inspect <snapshot> <query>
-winsnap inspect <snapshot> <query> --details
-```
-
-Search all snapshots:
-
-```bash
-winsnap search <query>
-winsnap search <query> --details
-```
-
-Delete a snapshot:
-
-```bash
-winsnap delete <name>
-```
-
-Show version:
-
-```bash
-winsnap version
-winsnap --version
-winsnap -v
-```
-
-Show help:
-
-```bash
-winsnap help
-winsnap --help
-winsnap -h
-```
-
-Risk Hints
-----------
-
-Risk hints are currently archived while filtering is developed to reduce noisy output.
-
-Snapshots still collect processes, services, scheduled tasks, registry autoruns, startup folder entries, and network listeners. Diff, inspect, and search output continues to show raw changes and matching entries without risk-hint labels.
-
-Scheduled Task Collection
--------------------------
-
-Scheduled task snapshots currently collect:
-
-- Task name
-- Task path
-- State
-- Author
-- Run as user
-- Triggers
-- Actions
-
-Registry Autorun Collection
----------------------------
-
-Registry autorun snapshots currently collect Run and RunOnce values from:
-
-- `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
-- `HKCU\Software\Microsoft\Windows\CurrentVersion\RunOnce`
-- `HKLM\Software\Microsoft\Windows\CurrentVersion\Run`
-- `HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnce`
-- `HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run`
-- `HKLM\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\RunOnce`
-
-Startup Folder Collection
--------------------------
-
-Startup folder snapshots currently collect direct files from:
-
-- `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`
-- `%PROGRAMDATA%\Microsoft\Windows\Start Menu\Programs\Startup`
-
-Shortcut (`.lnk`) entries include target path, arguments, and working directory when available.
-
-Network Listener Collection
----------------------------
-
-Network listener snapshots currently collect:
-
-- TCP listening ports
-- UDP bound endpoints
-- Local address and port
-- Owning process ID
-- Process name and path when available
-- Service names associated with the owning process when available
-
-Snapshot Storage
-----------------
-
-Snapshots are stored as JSON files in `snapshots/`.
-
-Snapshot names may contain only:
-
-- Letters
-- Numbers
-- Dashes
-- Underscores
-
-Project Direction
------------------
-
-WinSnap is being built toward local Windows security change analysis: capture system state before and after an event, then inspect what changed.
-
-Planned future collectors may include:
-
-- Defender settings
-Filtering
----------
-
-By default, `winsnap diff` reduces routine process churn to keep output readable. Use `--all` to see every change.
-
-WinSnap never deletes evidence; filtered items remain in the diff internally.
-
-Default filtering also deprioritizes:
-- Ephemeral localhost listeners without service association or matching new inbound firewall rules
-- Trusted signed Microsoft-only binary content changes (evidence preserved and visible with `--all`)
+Snapshots are JSON files in `snapshots/`, relative to the current directory. Names may contain only letters, numbers, dashes, and underscores.
 
 Caching
 -------
 
-`winsnap create <name> --cache` stores file hashes and signatures in `snapshots/.hashcache.json` and reuses them when a file's size and modification time are unchanged. This makes repeat snapshots much faster (only changed binaries are re-read).
+`winsnap create <name> --cache` stores file hashes and signatures in `snapshots/.hashcache.json` and reuses them when a file's size and mtime are unchanged.
 
-Security note: caching is opt-in and off by default. A file's modification time and size can be spoofed, so an attacker who alters a binary and resets its timestamp could evade detection when caching is enabled. Always re-hash (no `--cache`) for high-assurance comparisons.
+Caching is opt-in and off by default. Size and mtime can be spoofed, so an attacker who edits a binary and resets its timestamp could evade detection while caching is enabled. Re-hash without `--cache` for high-assurance comparisons.
 
 Permissions
 -----------
 
-Some collectors may require elevated privileges to return complete data (e.g., firewall rules). WinSnap records collector status; diffs skip categories that failed to collect.
+Some collectors need elevation to return complete data (for example, firewall rules). WinSnap records collector status and skips categories that failed to collect.
 
 Schema
 ------
 
-Snapshots include a schema version and collector status. See `docs/SCHEMA.md` for details.
+Snapshots carry a schema version and per-collector status. See `docs/SCHEMA.md` for the layout.

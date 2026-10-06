@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0
+
+- Reduced diff noise:
+  - Process diffs key on the executable rather than the command line, so net instance counts are reported instead of command-line churn.
+  - Service process ID changes are no longer reported (they change on every restart).
+  - Ephemeral UDP listeners from shared service hosts (svchost.exe) are deprioritized unless paired with a new inbound firewall rule.
+  - Filtered items remain preserved and are restored with `--all`.
+
 ## 1.2.0
 
 - Performance: ported all collectors off PowerShell to native Win32 APIs (toolhelp snapshots, Service Control Manager, Netapi32, iphlpapi, registry, and .lnk binary parsing), collected in parallel.
