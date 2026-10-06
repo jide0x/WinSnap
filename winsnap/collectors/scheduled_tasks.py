@@ -51,7 +51,7 @@ _kernel32.LocalFree.restype = ctypes.c_void_p
 _shlwapi.SHLoadIndirectString.argtypes = [
     wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.UINT, ctypes.c_void_p,
 ]
-_shlwapi.SHLoadIndirectString.restype = wintypes.HRESULT
+_shlwapi.SHLoadIndirectString.restype = ctypes.c_long
 
 
 def _trigger_class(trigger_type, block):

@@ -36,7 +36,7 @@ _shlwapi = ctypes.windll.shlwapi
 _shlwapi.SHLoadIndirectString.argtypes = [
     wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.UINT, ctypes.c_void_p,
 ]
-_shlwapi.SHLoadIndirectString.restype = wintypes.HRESULT
+_shlwapi.SHLoadIndirectString.restype = ctypes.c_long
 
 
 def _resolve_display_name(name):
