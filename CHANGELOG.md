@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- Fixed import errors on Python 3.10-3.12 by replacing `ctypes.wintypes.HRESULT` (added in 3.13) with `ctypes.c_long` in the `SHLoadIndirectString` bindings. No behavior or performance change.
+
 ## 1.3.0
 
 - Reduced diff noise:

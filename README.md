@@ -3,7 +3,7 @@ WinSnap
 
 WinSnap is a Windows command-line tool that captures system state as JSON snapshots and diffs them to show what changed between two points in time.
 
-Current version: `1.3.0`
+Current version: `1.3.1`
 
 Install
 -------
