@@ -2,7 +2,7 @@ from collections import Counter, defaultdict
 
 
 def process_key(proc):
-    return f"{proc.get('Name')}|{proc.get('ExecutablePath')}|{proc.get('CommandLine')}"
+    return f"{proc.get('Name')}|{proc.get('ExecutablePath')}"
 
 
 def service_key(service):
@@ -92,7 +92,8 @@ def diff_services(before, after):
 
 
 def service_changes(before_service, after_service):
-    fields = ["DisplayName", "State", "Status", "StartMode", "StartName", "PathName", "ProcessId"]
+    # ProcessId excluded: it changes on every service restart and is pure churn.
+    fields = ["DisplayName", "State", "Status", "StartMode", "StartName", "PathName"]
     changes = {}
 
     for field in fields:

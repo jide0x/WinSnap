@@ -2,7 +2,46 @@ import unittest
 
 from winsnap.artifacts import ARTIFACTS_BY_KEY
 from winsnap.commands.diff import compatibility_report, diff_if_compatible
-from winsnap.differ import diff_firewall_rules, diff_installed_software, diff_local_groups, diff_local_users, diff_network_listeners, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
+from winsnap.differ import diff_firewall_rules, diff_installed_software, diff_local_groups, diff_local_users, diff_network_listeners, diff_processes, diff_registry_autoruns, diff_scheduled_tasks, diff_services, diff_startup_folders
+
+
+class ProcessDiffTests(unittest.TestCase):
+    def test_command_line_change_is_not_a_process_change(self):
+        before = {
+            "processes": [
+                process("chrome.exe", "C:\\Program Files\\Google\\Chrome\\chrome.exe", CommandLine="--type=utility --foo"),
+                process("chrome.exe", "C:\\Program Files\\Google\\Chrome\\chrome.exe", CommandLine="--type=renderer --bar"),
+            ]
+        }
+        after = {
+            "processes": [
+                process("chrome.exe", "C:\\Program Files\\Google\\Chrome\\chrome.exe", CommandLine="--type=utility --foo"),
+                process("chrome.exe", "C:\\Program Files\\Google\\Chrome\\chrome.exe", CommandLine="--type=renderer --baz"),
+            ]
+        }
+
+        diff = diff_processes(before, after)
+
+        self.assertEqual(diff["added"], [])
+        self.assertEqual(diff["removed"], [])
+
+    def test_net_instance_count_change_detected(self):
+        before = {
+            "processes": [
+                process("svchost.exe", "C:\\Windows\\System32\\svchost.exe"),
+            ]
+        }
+        after = {
+            "processes": [
+                process("svchost.exe", "C:\\Windows\\System32\\svchost.exe"),
+                process("svchost.exe", "C:\\Windows\\System32\\svchost.exe"),
+            ]
+        }
+
+        diff = diff_processes(before, after)
+
+        self.assertEqual(len(diff["added"]), 1)
+        self.assertEqual(diff["removed"], [])
 
 
 class ServiceDiffTests(unittest.TestCase):
@@ -44,6 +83,14 @@ class ServiceDiffTests(unittest.TestCase):
     def test_missing_legacy_hash_does_not_report_content_change(self):
         before = {"services": [service("svc")]}
         after = {"services": [service("svc", file={"sha256": "new"})]}
+
+        diff = diff_services(before, after)
+
+        self.assertEqual(diff["changed"], [])
+
+    def test_process_id_change_is_not_reported(self):
+        before = {"services": [service("svc", ProcessId=100)]}
+        after = {"services": [service("svc", ProcessId=200)]}
 
         diff = diff_services(before, after)
 
@@ -315,6 +362,18 @@ class CompatibilityTests(unittest.TestCase):
 
         self.assertEqual([svc["Name"] for svc in diff["added"]], ["newsvc"])
         self.assertEqual([svc["Name"] for svc in diff["removed"]], ["oldsvc"])
+
+
+def process(name, path, **overrides):
+    data = {
+        "ProcessId": 1000,
+        "ParentProcessId": 0,
+        "Name": name,
+        "ExecutablePath": path,
+        "CommandLine": path,
+    }
+    data.update(overrides)
+    return data
 
 
 def service(name, **overrides):

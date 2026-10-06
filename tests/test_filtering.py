@@ -34,6 +34,51 @@ class FilteringTests(unittest.TestCase):
         self.assertEqual(len(out["processes"]["added"]), 1)
         self.assertEqual(len(out["processes"]["removed"]), 1)
 
+    def test_ephemeral_svchost_udp_listener_filtered(self):
+        before = {}
+        after = {}
+        diff = {
+            "network_listeners": {
+                "added": [
+                    {
+                        "Protocol": "UDP",
+                        "LocalAddress": "0.0.0.0",
+                        "LocalPort": 51922,
+                        "ProcessName": "svchost.exe",
+                        "ServiceNames": ["Dnscache"],
+                    }
+                ],
+                "removed": [],
+                "changed": [],
+            }
+        }
+        filtered = apply_filters(before, after, diff, mode="default")
+        self.assertEqual(len(filtered["network_listeners"]["added"]), 0)
+        self.assertEqual(
+            len(filtered["network_listeners"]["_filtered"]["added_listeners"]), 1
+        )
+
+    def test_low_port_bind_all_listener_kept(self):
+        before = {}
+        after = {}
+        diff = {
+            "network_listeners": {
+                "added": [
+                    {
+                        "Protocol": "TCP",
+                        "LocalAddress": "0.0.0.0",
+                        "LocalPort": 80,
+                        "ProcessName": "svchost.exe",
+                        "ServiceNames": ["HTTP"],
+                    }
+                ],
+                "removed": [],
+                "changed": [],
+            }
+        }
+        filtered = apply_filters(before, after, diff, mode="default")
+        self.assertEqual(len(filtered["network_listeners"]["added"]), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

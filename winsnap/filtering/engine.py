@@ -110,9 +110,25 @@ def _reduce_process_churn(added: List[Dict[str, Any]], removed: List[Dict[str, A
     return vis_added, fil_added, vis_removed, fil_removed
 
 
+_EPHEMERAL_PORT_START = 49152
+_SHARED_SERVICE_HOSTS = {"svchost.exe"}
+
+
 def _is_bind_all(addr: Any) -> bool:
     a = str(addr or "").lower()
     return a in {"0.0.0.0", "::", "[::]"}
+
+
+def _is_ephemeral_shared_host_udp(listener: Dict[str, Any]) -> bool:
+    if str(listener.get("Protocol") or "").upper() != "UDP":
+        return False
+    if str(listener.get("ProcessName") or "").lower() not in _SHARED_SERVICE_HOSTS:
+        return False
+    try:
+        port = int(listener.get("LocalPort"))
+    except (TypeError, ValueError):
+        return False
+    return port >= _EPHEMERAL_PORT_START
 
 
 def _rule_matches_listener(rule: Dict[str, Any], listener: Dict[str, Any]) -> bool:
@@ -160,6 +176,14 @@ def _deprioritize_ephemeral_listeners(before: Dict[str, Any], after: Dict[str, A
     fw_added = (diff.get("firewall_rules") or {}).get("added", [])
 
     def should_filter(listener: Dict[str, Any]) -> bool:
+        # Paired with a new inbound firewall rule -> keep
+        for rule in fw_added:
+            if _rule_matches_listener(rule, listener):
+                return False
+        # Ephemeral high ports under a shared service host are routine churn
+        # (DNS/DHCP/WebClient under svchost.exe).
+        if _is_ephemeral_shared_host_udp(listener):
+            return True
         # Prefer to keep bind-all or service-associated listeners
         if _is_bind_all(listener.get("LocalAddress")):
             return False
@@ -167,10 +191,6 @@ def _deprioritize_ephemeral_listeners(before: Dict[str, Any], after: Dict[str, A
         svc_names = listener.get("ServiceNames") or []
         if isinstance(svc_names, list) and svc_names:
             return False
-        # If paired with new inbound firewall rule, keep
-        for rule in fw_added:
-            if _rule_matches_listener(rule, listener):
-                return False
         # Otherwise filter (likely ephemeral localhost listener)
         return True
 
